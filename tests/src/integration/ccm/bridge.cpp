@@ -1348,7 +1348,14 @@ std::string CCM::Bridge::execute_ccm_command(const std::vector<std::string>& com
       throw BridgeException(message.str());
     }
 #endif
-    utils::Process::Result result = utils::Process::execute(ccm_command);
+    // Check if we need to use Java 17 environment for Cassandra 5.0+
+    bool use_java17_env = false;
+    if (is_cassandra() && cassandra_version_ >= CassVersion("5.0.0")) {
+      use_java17_env = true;
+      LOG("Cassandra 5.0+ detected, will use Java 17 environment for CCM");
+    }
+    
+    utils::Process::Result result = utils::Process::execute(ccm_command, use_java17_env);
     if (result.exit_status != 0) {
       throw BridgeException(result.standard_error);
     }
@@ -1486,8 +1493,8 @@ CCM::Bridge::generate_create_updateconf_command(CassVersion cassandra_version) {
     updateconf_command.push_back("enable_user_defined_functions:true");
   }
 
-  // Create Cassandra version specific updated (C* 3.0+)
-  if (cassandra_version >= "3.0.0") {
+  // Create Cassandra version specific updated (C* 3.0+ but removed in 5.0)
+  if (cassandra_version >= "3.0.0" && cassandra_version < "5.0.0") {
     updateconf_command.push_back("enable_scripted_user_defined_functions:true");
   }
 

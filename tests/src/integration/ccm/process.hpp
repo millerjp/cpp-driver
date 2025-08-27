@@ -76,6 +76,17 @@ public:
    */
   static Result execute(const Args& command);
 
+  /**
+   * Execute an external process with modified environment for Java 17
+   * This is specifically for running CCM with Cassandra 5.0+ which requires Java 17.
+   * The environment modification is ONLY applied to the subprocess, not globally.
+   *
+   * @param command Command array to execute ([0] = command, [1-n] arguments)
+   * @param use_java17_env If true, modifies JAVA_HOME and PATH in subprocess environment only
+   * @throws Process::Exception if failed to execute process
+   */
+  static Result execute(const Args& command, bool use_java17_env);
+
 private:
   Process() {}
 

@@ -19,8 +19,16 @@
 #include <iostream>
 #include <sstream>
 #include <string.h>
+#include <stdlib.h>
 
 #include <uv.h>
+
+// Platform-specific includes for environment handling
+#ifdef _WIN32
+#include <windows.h>
+#else
+extern char **environ;
+#endif
 
 // Create simple console logging functions
 #define LOG_MESSAGE(message, is_output)               \
@@ -32,6 +40,11 @@
 namespace utils {
 
 Process::Result Process::execute(const Args& command) {
+  // Call the new overload with use_java17_env = false to maintain existing behavior
+  return execute(command, false);
+}
+
+Process::Result Process::execute(const Args& command, bool use_java17_env) {
   Result result;
 
   // Create the loop
@@ -63,6 +76,89 @@ Process::Result Process::execute(const Args& command) {
   options.args = const_cast<char**>(&args[0]);
   options.exit_cb = Process::on_exit;
   options.file = command[0].c_str();
+
+  // Handle environment modification for Java 17 (only for subprocess, not global)
+  std::vector<std::string> env_strings;
+  std::vector<char*> env_array;
+  
+  if (use_java17_env) {
+    const char* java17_home = getenv("JAVA17_HOME");
+    
+    if (!java17_home) {
+      std::cerr << "WARNING: JAVA17_HOME not set. Cassandra 5.0+ requires Java 11 or higher." << std::endl;
+      std::cerr << "         Set JAVA17_HOME environment variable before running tests." << std::endl;
+      // Continue anyway - let CCM fail with its own error message
+    } else {
+      // Build modified environment for the subprocess only
+#ifdef _WIN32
+      // Windows: Get current environment and modify it
+      LPCH env_block = GetEnvironmentStrings();
+      if (env_block) {
+        LPTSTR var = env_block;
+        while (*var) {
+          std::string env_var(var);
+          
+          // Skip existing JAVA_HOME, we'll set our own
+          if (env_var.find("JAVA_HOME=") == 0) {
+            var += lstrlen(var) + 1;
+            continue;
+          }
+          
+          // Modify PATH to prepend Java 17 bin directory
+          if (env_var.find("PATH=") == 0 || env_var.find("Path=") == 0) {
+            size_t equals_pos = env_var.find('=');
+            std::string path_value = env_var.substr(equals_pos + 1);
+            env_strings.push_back("PATH=" + std::string(java17_home) + "\\bin;" + path_value);
+          } else {
+            env_strings.push_back(env_var);
+          }
+          
+          var += lstrlen(var) + 1;
+        }
+        FreeEnvironmentStrings(env_block);
+        
+        // Add JAVA_HOME pointing to Java 17
+        env_strings.push_back(std::string("JAVA_HOME=") + java17_home);
+      }
+#else
+      // Linux/Unix: Copy current environment and modify it
+      for (char **env = environ; *env != nullptr; ++env) {
+        std::string env_var(*env);
+        
+        // Skip existing JAVA_HOME, we'll set our own
+        if (env_var.find("JAVA_HOME=") == 0) {
+          continue;
+        }
+        
+        // Modify PATH to prepend Java 17 bin directory
+        if (env_var.find("PATH=") == 0) {
+          size_t equals_pos = env_var.find('=');
+          std::string path_value = env_var.substr(equals_pos + 1);
+          env_strings.push_back("PATH=" + std::string(java17_home) + "/bin:" + path_value);
+        } else {
+          env_strings.push_back(env_var);
+        }
+      }
+      
+      // Add JAVA_HOME pointing to Java 17
+      env_strings.push_back(std::string("JAVA_HOME=") + java17_home);
+#endif
+      
+      // Convert string vector to char* array for libuv
+      for (auto& str : env_strings) {
+        env_array.push_back(const_cast<char*>(str.c_str()));
+      }
+      env_array.push_back(nullptr);
+      
+      // Set the environment for the subprocess only
+      options.env = env_array.data();
+      
+      // Log that we're using Java 17 environment
+      std::cerr << "INFO: Using Java 17 environment for CCM (JAVA_HOME=" << java17_home << ")" << std::endl;
+    }
+  }
+  // If use_java17_env is false or JAVA17_HOME not set, options.env remains nullptr 
+  // which means the subprocess inherits the current environment unchanged
 
   // Spawn the process
   uv_process_t process;
