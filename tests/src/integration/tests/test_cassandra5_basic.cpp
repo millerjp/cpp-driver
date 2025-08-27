@@ -73,3 +73,36 @@ CASSANDRA_INTEGRATION_TEST_F(Cassandra5BasicTest, Cassandra5Features) {
   // Future: Add vector type tests here once implemented
   TEST_LOG("Cassandra 5.0+ confirmed, ready for vector type implementation");
 }
+
+/**
+ * Verify we are actually running against Cassandra 5.0+
+ * This test queries the system.local table to get the actual Cassandra version
+ * and verifies it's 5.0.0 or higher
+ */
+CASSANDRA_INTEGRATION_TEST_F(Cassandra5BasicTest, VerifyCassandra5Version) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  // Query the actual Cassandra version from system.local
+  Result result = session_.execute("SELECT release_version FROM system.local");
+  ASSERT_EQ(1ul, result.row_count());
+  
+  Row row = result.first_row();
+  Text version = row.column_by_name<Text>("release_version");
+  std::string version_str = version.str();
+  
+  TEST_LOG("Connected to Cassandra version: " << version_str);
+  
+  // Parse the version string (format: X.Y.Z or X.Y.Z-SNAPSHOT)
+  // We need to verify it's at least 5.0.0
+  int major = 0, minor = 0, patch = 0;
+  if (sscanf(version_str.c_str(), "%d.%d.%d", &major, &minor, &patch) >= 2) {
+    ASSERT_GE(major, 5) << "Expected Cassandra 5.0 or higher, but got " << version_str;
+    if (major == 5) {
+      ASSERT_GE(minor, 0) << "Expected Cassandra 5.0 or higher, but got " << version_str;
+    }
+    TEST_LOG("Version check passed: Cassandra " << major << "." << minor << "." << patch << " >= 5.0.0");
+  } else {
+    FAIL() << "Could not parse Cassandra version: " << version_str;
+  }
+}
