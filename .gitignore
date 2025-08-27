@@ -98,6 +98,9 @@ boost_1_*
 # Integration test configuration
 config*.txt
 
+# Test log directory
+log/
+
 # Test programs in root directory
 /test_*
 /*.c
