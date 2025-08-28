@@ -96,7 +96,14 @@ bool VectorIterator::next() {
     }
     
     size_t bytes_read = 0;
-    uint32_t size = decode_uvint32(reinterpret_cast<const uint8_t*>(decoder_.input_), &bytes_read);
+    uint32_t size = decode_uvint32_safe(reinterpret_cast<const uint8_t*>(decoder_.input_), 
+                                          decoder_.remaining_, &bytes_read);
+    
+    if (bytes_read == 0) {
+      // Failed to decode uvint
+      LOG_ERROR("Failed to decode uvint in vector iterator");
+      return false;
+    }
     
     if (decoder_.remaining_ < bytes_read + size) {
       return false;

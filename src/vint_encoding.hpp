@@ -89,6 +89,42 @@ inline uint32_t decode_uvint32(const uint8_t* buf, size_t* bytes_read) {
   return value;
 }
 
+// Bounds-safe version that checks buffer limits
+inline uint32_t decode_uvint32_safe(const uint8_t* buf, size_t max_bytes, size_t* bytes_read) {
+  uint32_t value = 0;
+  size_t shift = 0;
+  size_t index = 0;
+  
+  // Limit to 5 bytes max for uint32 (5*7=35 bits, enough for 32-bit value)
+  size_t limit = max_bytes < 5 ? max_bytes : 5;
+  
+  while (index < limit) {
+    uint8_t byte = buf[index++];
+    value |= (static_cast<uint32_t>(byte & 0x7F) << shift);
+    
+    if ((byte & 0x80) == 0) {
+      // No continuation bit, this is the last byte
+      if (bytes_read) {
+        *bytes_read = index;
+      }
+      return value;
+    }
+    
+    shift += 7;
+    if (shift >= 32) {
+      // Would overflow uint32
+      break;
+    }
+  }
+  
+  // Failed to decode complete value
+  if (bytes_read) {
+    *bytes_read = 0;  // Signal failure
+  }
+  
+  return 0;
+}
+
 }}} // namespace datastax::internal::core
 
 #endif

@@ -25,6 +25,8 @@
 #include <string.h>
 #include <cassert>
 #include <cstdio>
+#include <climits>
+#include <cstdint>
 
 namespace {
 
@@ -60,7 +62,9 @@ bool is_supported_vector_element_type(CassValueType type) {
   }
 }
 
-const size_t MAX_VECTOR_DIMENSION = 65536;
+// Cassandra 5.0 limits vectors to 8K (2^13) dimensions
+// See: https://cassandra.apache.org/doc/latest/cassandra/reference/vector-data-type.html
+const size_t MAX_VECTOR_DIMENSION = 8192;
 
 } // anonymous namespace
 
@@ -432,11 +436,32 @@ Buffer VectorValue::encode() const {
   // Calculate total size including length prefixes if needed
   size_t total_size = 0;
   for (BufferVec::const_iterator i = items_.begin(), end = items_.end(); i != end; ++i) {
+    // Check for size truncation when casting to uint32_t
+    if (i->size() > UINT32_MAX) {
+      LOG_ERROR("Vector element size exceeds maximum: %zu", i->size());
+      return Buffer();  // Return empty buffer on error
+    }
+    
+    size_t element_size = i->size();
     if (is_variable_size) {
       // Variable-length integer prefix for variable-size types
-      total_size += compute_uvint32_size(static_cast<uint32_t>(i->size())) + i->size();
+      size_t prefix_size = compute_uvint32_size(static_cast<uint32_t>(element_size));
+      
+      // Check for overflow before adding
+      if (total_size > SIZE_MAX - prefix_size - element_size) {
+        LOG_ERROR("Vector encoded size would overflow");
+        return Buffer();  // Return empty buffer on error
+      }
+      
+      total_size += prefix_size + element_size;
     } else {
-      total_size += i->size();
+      // Check for overflow before adding
+      if (total_size > SIZE_MAX - element_size) {
+        LOG_ERROR("Vector encoded size would overflow");
+        return Buffer();  // Return empty buffer on error
+      }
+      
+      total_size += element_size;
     }
   }
   

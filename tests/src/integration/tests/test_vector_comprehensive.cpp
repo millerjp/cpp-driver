@@ -363,7 +363,8 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, DimensionLimits) {
   cass_future_free(future);
   ASSERT_EQ(CASS_OK, rc);
   
-  // Cassandra 5.0 has a maximum dimension limit (often 8192)
+  // Cassandra 5.0 has a maximum dimension limit of 8192 (8K)
+  // The driver enforces this limit to prevent invalid requests
   // Test near the limit would be:
   // session_.execute("CREATE TABLE dim_8192 (id int PRIMARY KEY, v vector<float, 8192>)");
 }
