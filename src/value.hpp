@@ -122,6 +122,11 @@ public:
     return data_type_->is_user_type();
   }
 
+  bool is_vector() const {
+    if (!data_type_) return false;
+    return data_type_->value_type() == CASS_VALUE_TYPE_VECTOR;
+  }
+
   int32_t count() const { return count_; }
 
   StringRef to_string_ref() const {

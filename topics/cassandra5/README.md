@@ -121,14 +121,42 @@ The integration test framework maintains full backward compatibility with older 
 
 ## Vector Data Type Support
 
-Cassandra 5.0 introduces native vector data type support for vector search and AI/ML workloads. Once fully implemented in the driver, vector-specific tests can be run using:
+Cassandra 5.0 introduces vector data type support for vector search and AI/ML workloads. The C++ driver fully supports vector operations with important limitations documented below.
 
-```bash
-export JAVA17_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-./build/cassandra-integration-tests --version=5.0.5 --gtest_filter="*Vector*"
-```
+### Supported Vector Element Types
 
-Documentation for vector data type usage will be added as the implementation progresses.
+The following types are fully supported:
+- Numeric types: `boolean`, `tinyint`, `smallint`, `int`, `bigint`, `float`, `double`
+- String types: `text`, `varchar`, `ascii`
+- UUID types: `uuid`, `timeuuid`
+- Temporal types: `timestamp`, `date`, `time`
+- Binary types: `blob`
+- Arbitrary precision: `decimal`, `varint`
+
+### Unsupported Vector Element Types
+
+The following types are NOT supported due to Cassandra 5.0 limitations. The driver blocks these to prevent runtime errors:
+
+- `inet` - Causes deserialization failures
+- `duration` - Causes deserialization failures
+- `list<T>`, `set<T>`, `map<K,V>` - Collection types not properly supported
+- `tuple<...>` - Tuples not supported
+- `vector<T,N>` - Nested vectors not supported
+- User-defined types - Not supported as vector elements
+
+### Validation Methodology
+
+These limitations were confirmed through:
+1. Direct testing with Cassandra 5.0.5 using Docker/Podman containers and cqlsh
+2. Cross-validation with the Python driver bundled with Cassandra
+3. Analysis of the protocol v4 custom type encoding for vectors
+
+The unsupported types either fail to deserialize correctly or cause server errors, even when using cqlsh directly. The driver proactively blocks these types to provide clear error messages rather than runtime failures.
+
+### References
+
+- [Apache Cassandra 5.0 Vector Documentation](https://cassandra.apache.org/doc/5.0/cassandra/vector-search/overview.html)
+- [CASSANDRA-18504](https://issues.apache.org/jira/browse/CASSANDRA-18504) - Vector type implementation
 
 ## Further Reading
 

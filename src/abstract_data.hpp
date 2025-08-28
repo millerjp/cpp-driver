@@ -36,6 +36,7 @@
 
 namespace datastax { namespace internal { namespace core {
 
+class VectorValue;
 class Tuple;
 class UserTypeValue;
 
@@ -118,6 +119,7 @@ public:
   CassError set(size_t index, const Collection* value);
   CassError set(size_t index, const Tuple* value);
   CassError set(size_t index, const UserTypeValue* value);
+  CassError set(size_t index, const VectorValue* value);
 
   template <class T>
   CassError set(StringRef name, const T value) {

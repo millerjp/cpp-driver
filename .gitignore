@@ -111,3 +111,5 @@ log/
 # Build artifacts
 compile_commands.json
 embedded-ads.jar
+# Python virtual environment
+venv/

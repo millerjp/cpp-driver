@@ -59,6 +59,7 @@ class Value; // Forward declaration
  */
 class Decoder {
   friend class Value;
+  friend class VectorIterator;
 
 public:
   Decoder()

@@ -204,6 +204,9 @@ Value::Value(const DataType::ConstPtr& data_type, Decoder decoder)
   } else if (data_type->is_user_type()) {
     const UserType& user_type = static_cast<const UserType&>(*data_type);
     count_ = user_type.fields().size();
+  } else if (data_type->value_type() == CASS_VALUE_TYPE_VECTOR) {
+    const VectorType& vector_type = static_cast<const VectorType&>(*data_type);
+    count_ = vector_type.dimension();
   }
 }
 
@@ -219,6 +222,9 @@ bool Value::update(const Decoder& decoder) {
     } else if (data_type_->is_user_type()) {
       const UserType& user_type = static_cast<const UserType&>(*data_type_);
       count_ = user_type.fields().size();
+    } else if (data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
+      const VectorType& vector_type = static_cast<const VectorType&>(*data_type_);
+      count_ = vector_type.dimension();
     }
   } else {
     count_ = 0;

@@ -22,6 +22,7 @@
 #include "result_iterator.hpp"
 #include "row_iterator.hpp"
 #include "user_type_field_iterator.hpp"
+#include "vector_iterator.hpp"
 
 using namespace datastax;
 using namespace datastax::internal::core;
@@ -56,6 +57,13 @@ CassIterator* cass_iterator_from_tuple(const CassValue* value) {
     return NULL;
   }
   return CassIterator::to(new TupleIterator(value));
+}
+
+CassIterator* cass_iterator_from_vector(const CassValue* value) {
+  if (value->is_null() || !value->is_vector()) {
+    return NULL;
+  }
+  return CassIterator::to(new VectorIterator(value));
 }
 
 CassIterator* cass_iterator_from_map(const CassValue* value) {

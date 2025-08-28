@@ -162,6 +162,9 @@ public:
     return offset + sizeof(CassUuid);
   }
 
+  // Variable-length integer encoding (for vector element size prefixes)
+  size_t encode_uvint32(size_t offset, uint32_t value);
+
   size_t copy(size_t offset, const char* value, size_t size) {
     assert(offset + size <= static_cast<size_t>(size_));
     memcpy(data() + offset, value, size);

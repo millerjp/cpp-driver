@@ -16,6 +16,7 @@
 
 #include "abstract_data.hpp"
 
+#include "vector_value.hpp"
 #include "collection.hpp"
 #include "constants.hpp"
 #include "request.hpp"
@@ -41,6 +42,15 @@ CassError AbstractData::set(size_t index, const Collection* value) {
 
 CassError AbstractData::set(size_t index, const Tuple* value) {
   CASS_CHECK_INDEX_AND_TYPE(index, value);
+  elements_[index] = value->encode_with_length();
+  return CASS_OK;
+}
+
+CassError AbstractData::set(size_t index, const VectorValue* value) {
+  CASS_CHECK_INDEX_AND_TYPE(index, value);
+  // For protocol v4, vectors need to be sent as custom types
+  // We can't just encode the vector directly - we need to wrap it as a custom type
+  // For now, store the vector and handle the custom type encoding in the protocol layer
   elements_[index] = value->encode_with_length();
   return CASS_OK;
 }

@@ -16,6 +16,7 @@
 
 #include "data_type.hpp"
 
+#include "vector_value.hpp"
 #include "collection.hpp"
 #include "external.hpp"
 #include "tuple.hpp"
@@ -409,5 +410,10 @@ bool IsValidDataType<const Tuple*>::operator()(const Tuple* value,
 
 bool IsValidDataType<const UserTypeValue*>::operator()(const UserTypeValue* value,
                                                        const DataType::ConstPtr& data_type) const {
+  return value->data_type()->equals(data_type);
+}
+
+bool IsValidDataType<const VectorValue*>::operator()(const VectorValue* value,
+                                                     const DataType::ConstPtr& data_type) const {
   return value->data_type()->equals(data_type);
 }

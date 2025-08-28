@@ -30,6 +30,7 @@
 
 namespace datastax { namespace internal { namespace core {
 
+class VectorValue;
 class Collection;
 class Tuple;
 class UserTypeValue;
@@ -291,6 +292,132 @@ public:
   virtual DataType::Ptr copy() const { return DataType::Ptr(new TupleType(types_, is_frozen())); }
 };
 
+class VectorType : public DataType {
+public:
+  typedef SharedRefPtr<const VectorType> ConstPtr;
+  typedef SharedRefPtr<VectorType> Ptr;
+
+  VectorType(const DataType::ConstPtr& element_type, size_t dimension)
+      : DataType(CASS_VALUE_TYPE_VECTOR, false) // Vectors are never frozen
+      , element_type_(element_type)
+      , dimension_(dimension) {}
+
+  const DataType::ConstPtr& element_type() const { return element_type_; }
+  void set_element_type(const DataType::ConstPtr& element_type) { element_type_ = element_type; }
+  size_t dimension() const { return dimension_; }
+
+  virtual bool equals(const DataType::ConstPtr& data_type) const {
+    assert(value_type() == CASS_VALUE_TYPE_VECTOR);
+
+    if (value_type() != data_type->value_type()) {
+      return false;
+    }
+
+    const VectorType* vector_type = static_cast<const VectorType*>(data_type.get());
+
+    if (dimension_ != vector_type->dimension_) {
+      return false;
+    }
+
+    if (!element_type_->equals(vector_type->element_type_)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  virtual DataType::Ptr copy() const { 
+    return DataType::Ptr(new VectorType(element_type_, dimension_)); 
+  }
+
+  virtual String to_string() const {
+    OStringStream ss;
+    ss << "vector<" << element_type_->to_string() << ", " << dimension_ << ">";
+    return ss.str();
+  }
+  
+  String to_class_name() const {
+    // Generate the Cassandra class name for the custom type
+    // e.g. "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)"
+    String element_class;
+    switch (element_type_->value_type()) {
+      case CASS_VALUE_TYPE_FLOAT:
+        element_class = "org.apache.cassandra.db.marshal.FloatType";
+        break;
+      case CASS_VALUE_TYPE_DOUBLE:
+        element_class = "org.apache.cassandra.db.marshal.DoubleType";
+        break;
+      case CASS_VALUE_TYPE_INT:
+        element_class = "org.apache.cassandra.db.marshal.Int32Type";
+        break;
+      case CASS_VALUE_TYPE_BIGINT:
+        element_class = "org.apache.cassandra.db.marshal.LongType";
+        break;
+      case CASS_VALUE_TYPE_SMALL_INT:
+        element_class = "org.apache.cassandra.db.marshal.ShortType";
+        break;
+      case CASS_VALUE_TYPE_TINY_INT:
+        element_class = "org.apache.cassandra.db.marshal.ByteType";
+        break;
+      case CASS_VALUE_TYPE_BOOLEAN:
+        element_class = "org.apache.cassandra.db.marshal.BooleanType";
+        break;
+      case CASS_VALUE_TYPE_TEXT:
+      case CASS_VALUE_TYPE_VARCHAR:
+        element_class = "org.apache.cassandra.db.marshal.UTF8Type";
+        break;
+      case CASS_VALUE_TYPE_ASCII:
+        element_class = "org.apache.cassandra.db.marshal.AsciiType";
+        break;
+      case CASS_VALUE_TYPE_BLOB:
+        element_class = "org.apache.cassandra.db.marshal.BytesType";
+        break;
+      case CASS_VALUE_TYPE_UUID:
+        element_class = "org.apache.cassandra.db.marshal.UUIDType";
+        break;
+      case CASS_VALUE_TYPE_TIMEUUID:
+        element_class = "org.apache.cassandra.db.marshal.TimeUUIDType";
+        break;
+      case CASS_VALUE_TYPE_TIMESTAMP:
+        element_class = "org.apache.cassandra.db.marshal.TimestampType";
+        break;
+      case CASS_VALUE_TYPE_DATE:
+        element_class = "org.apache.cassandra.db.marshal.SimpleDateType";
+        break;
+      case CASS_VALUE_TYPE_TIME:
+        element_class = "org.apache.cassandra.db.marshal.TimeType";
+        break;
+      case CASS_VALUE_TYPE_DURATION:
+        element_class = "org.apache.cassandra.db.marshal.DurationType";
+        break;
+      case CASS_VALUE_TYPE_DECIMAL:
+        element_class = "org.apache.cassandra.db.marshal.DecimalType";
+        break;
+      case CASS_VALUE_TYPE_VARINT:
+        element_class = "org.apache.cassandra.db.marshal.IntegerType";
+        break;
+      case CASS_VALUE_TYPE_INET:
+        element_class = "org.apache.cassandra.db.marshal.InetAddressType";
+        break;
+      case CASS_VALUE_TYPE_COUNTER:
+        element_class = "org.apache.cassandra.db.marshal.CounterColumnType";
+        break;
+      default:
+        // Unknown type - return empty string to indicate error
+        // Caller should check for empty string and handle error
+        return "";
+    }
+    
+    OStringStream ss;
+    ss << "org.apache.cassandra.db.marshal.VectorType(" << element_class << ", " << dimension_ << ")";
+    return ss.str();
+  }
+
+private:
+  DataType::ConstPtr element_type_;
+  size_t dimension_;
+};
+
 class UserType : public DataType {
   friend class Memory;
 
@@ -512,6 +639,14 @@ struct IsValidDataType<CassBytes> {
 template <>
 struct IsValidDataType<CassCustom> {
   bool operator()(const CassCustom& custom, const DataType::ConstPtr& data_type) const {
+    // For protocol v4, vectors are sent as custom types but metadata reports them as vectors
+    if (data_type->value_type() == CASS_VALUE_TYPE_VECTOR) {
+      // Check if the custom class name matches the vector's class name
+      const VectorType* vector_type = static_cast<const VectorType*>(data_type.get());
+      String expected_class = vector_type->to_class_name();
+      return custom.class_name == StringRef(expected_class);
+    }
+    
     if (!data_type->is_custom()) return false;
     CustomType::ConstPtr custom_type(data_type);
     return custom.class_name == custom_type->class_name();
@@ -559,6 +694,11 @@ struct IsValidDataType<const Tuple*> {
 template <>
 struct IsValidDataType<const UserTypeValue*> {
   bool operator()(const UserTypeValue* value, const DataType::ConstPtr& data_type) const;
+};
+
+template <>
+struct IsValidDataType<const VectorValue*> {
+  bool operator()(const VectorValue* value, const DataType::ConstPtr& data_type) const;
 };
 
 }}} // namespace datastax::internal::core

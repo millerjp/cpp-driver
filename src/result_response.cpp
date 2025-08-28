@@ -22,6 +22,7 @@
 #include "result_metadata.hpp"
 #include "result_response.hpp"
 #include "serialization.hpp"
+#include <cstdlib>
 
 using namespace datastax;
 using namespace datastax::internal;
@@ -135,6 +136,13 @@ private:
     StringRef class_name;
     if (!decoder_.decode_string(&class_name)) return DataType::NIL;
 
+    // Check if this is a vector type
+    if (class_name.find("org.apache.cassandra.db.marshal.VectorType") != StringRef::npos) {
+      // Parse the vector parameters
+      // Format: "org.apache.cassandra.db.marshal.VectorType(element_type, dimension)"
+      return decode_vector_from_custom(class_name);
+    }
+
     DataType::ConstPtr type = cache_.by_class(class_name);
     if (type) return type;
 
@@ -180,6 +188,116 @@ private:
       types.push_back(decode());
     }
     return DataType::ConstPtr(new TupleType(types, false));
+  }
+
+  DataType::ConstPtr decode_vector_from_custom(const StringRef& class_name) {
+    // The class name format from Cassandra 5.0 with protocol v4 is:
+    // "org.apache.cassandra.db.marshal.VectorType(element_type, dimension)"
+    // For example:
+    // "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)"
+    
+    String class_str = class_name.to_string();
+    
+    // Find the opening parenthesis
+    size_t paren_pos = class_str.find('(');
+    if (paren_pos == String::npos) {
+      // No parameters - malformed vector type
+      LOG_ERROR("Malformed vector custom type class name (no parameters): %s", class_str.c_str());
+      return DataType::NIL;
+    }
+    
+    // Find the closing parenthesis
+    size_t close_paren = class_str.find(')', paren_pos);
+    if (close_paren == String::npos) {
+      // Malformed - no closing parenthesis
+      LOG_ERROR("Malformed vector custom type class name (no closing parenthesis): %s", class_str.c_str());
+      return DataType::NIL;
+    }
+    
+    // Extract parameters string
+    String params = class_str.substr(paren_pos + 1, close_paren - paren_pos - 1);
+    
+    // Find the comma separating element type and dimension
+    size_t comma_pos = params.rfind(',');
+    if (comma_pos == String::npos) {
+      // No comma - malformed parameters
+      LOG_ERROR("Malformed vector custom type parameters (no comma): %s", params.c_str());
+      return DataType::NIL;
+    }
+    
+    // Extract element type class name and dimension
+    String element_class = params.substr(0, comma_pos);
+    String dimension_str = params.substr(comma_pos + 1);
+    
+    // Trim whitespace from dimension string
+    size_t first = dimension_str.find_first_not_of(' ');
+    size_t last = dimension_str.find_last_not_of(' ');
+    if (first != String::npos) {
+      dimension_str = dimension_str.substr(first, last - first + 1);
+    }
+    
+    // Parse dimension
+    size_t dimension = 3; // Default
+    char* end = NULL;
+    unsigned long parsed_dim = strtoul(dimension_str.c_str(), &end, 10);
+    if (end != dimension_str.c_str() && *end == '\0') {
+      dimension = parsed_dim;
+    }
+    
+    // Trim whitespace from element class
+    first = element_class.find_first_not_of(' ');
+    last = element_class.find_last_not_of(' ');
+    if (first != String::npos) {
+      element_class = element_class.substr(first, last - first + 1);
+    }
+    
+    // Map element class name to value type
+    DataType::ConstPtr element_type;
+    if (element_class.find("FloatType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_FLOAT);
+    } else if (element_class.find("DoubleType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_DOUBLE);
+    } else if (element_class.find("Int32Type") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_INT);
+    } else if (element_class.find("LongType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_BIGINT);
+    } else if (element_class.find("ByteType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_TINY_INT);
+    } else if (element_class.find("ShortType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_SMALL_INT);
+    } else if (element_class.find("BooleanType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_BOOLEAN);
+    } else if (element_class.find("UTF8Type") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_TEXT);
+    } else if (element_class.find("AsciiType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_ASCII);
+    } else if (element_class.find("UUIDType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_UUID);
+    } else if (element_class.find("TimeUUIDType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_TIMEUUID);
+    } else if (element_class.find("TimestampType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_TIMESTAMP);
+    } else if (element_class.find("SimpleDateType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_DATE);
+    } else if (element_class.find("TimeType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_TIME);
+    } else if (element_class.find("InetAddressType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_INET);
+    } else if (element_class.find("BytesType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_BLOB);
+    } else if (element_class.find("DecimalType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_DECIMAL);
+    } else if (element_class.find("IntegerType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_VARINT);
+    } else if (element_class.find("DurationType") != String::npos) {
+      element_type = cache_.by_value_type(CASS_VALUE_TYPE_DURATION);
+    } else {
+      // Unknown element type - log error and return NIL
+      LOG_ERROR("Unknown vector element type in custom class: %s", element_class.c_str());
+      return DataType::NIL;
+    }
+    
+    return DataType::ConstPtr(new VectorType(element_type, dimension));
   }
 
 private:

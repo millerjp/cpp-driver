@@ -63,18 +63,6 @@ CASSANDRA_INTEGRATION_TEST_F(Cassandra5BasicTest, ConnectAndQuery) {
 }
 
 /**
- * Test that we can handle Cassandra 5.0 specific features
- * This is a placeholder for future vector tests
- */
-CASSANDRA_INTEGRATION_TEST_F(Cassandra5BasicTest, Cassandra5Features) {
-  CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
-  
-  // Future: Add vector type tests here once implemented
-  TEST_LOG("Cassandra 5.0+ confirmed, ready for vector type implementation");
-}
-
-/**
  * Verify we are actually running against Cassandra 5.0+
  * This test queries the system.local table to get the actual Cassandra version
  * and verifies it's 5.0.0 or higher

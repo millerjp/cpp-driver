@@ -28,6 +28,8 @@
 #include "string_ref.hpp"
 #include "tuple.hpp"
 #include "user_type_value.hpp"
+#include "vector_value.hpp"
+#include "data_type.hpp"
 
 #include <uv.h>
 
@@ -261,6 +263,22 @@ CassError cass_statement_bind_custom_by_name_n(CassStatement* statement, const c
                                                size_t value_size) {
   return statement->set(StringRef(name, name_length),
                         CassCustom(StringRef(class_name, class_name_length), value, value_size));
+}
+
+CassError cass_statement_bind_vector(CassStatement* statement, size_t index, 
+                                     const CassVector* vector) {
+  // Store the vector directly - it will be serialized as custom type in the protocol layer
+  return statement->set(index, vector->from());
+}
+
+CassError cass_statement_bind_vector_by_name(CassStatement* statement, const char* name,
+                                             const CassVector* vector) {
+  return cass_statement_bind_vector_by_name_n(statement, name, SAFE_STRLEN(name), vector);
+}
+
+CassError cass_statement_bind_vector_by_name_n(CassStatement* statement, const char* name,
+                                               size_t name_length, const CassVector* vector) {
+  return statement->set(StringRef(name, name_length), vector->from());
 }
 
 } // extern "C"
