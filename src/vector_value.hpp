@@ -39,11 +39,10 @@ class UserTypeValue;
 class VectorValue : public Allocated {
 public:
   /**
-   * Create a vector with specified dimension
-   * Element type will be determined by first append
+   * Create a vector with specified element type and dimension
    */
-  explicit VectorValue(size_t dimension)
-      : data_type_(new VectorType(DataType::NIL, dimension))
+  VectorValue(CassValueType element_type, size_t dimension)
+      : data_type_(new VectorType(DataType::ConstPtr(new DataType(element_type)), dimension))
       , dimension_(dimension)
       , items_() {
     items_.reserve(dimension);
@@ -98,6 +97,7 @@ public:
   
 private:
   CassError check_append();
+  CassError check_element_type(CassValueType expected_type) const;
   
   template <class T>
   CassError append_fixed(T value);

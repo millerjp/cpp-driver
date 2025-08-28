@@ -62,7 +62,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, IntVectors) {
     "INSERT INTO int_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_INT, 3);
   cass_vector_append_int32(vector, 100);
   cass_vector_append_int32(vector, -200);
   cass_vector_append_int32(vector, 2147483647); // max int32
@@ -109,7 +109,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, BigintVectors) {
     "INSERT INTO bigint_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_BIGINT, 3);
   cass_vector_append_int64(vector, 1000000000000LL);
   cass_vector_append_int64(vector, -2000000000000LL);
   cass_vector_append_int64(vector, 9223372036854775807LL); // max int64
@@ -159,7 +159,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, SmallintVectors) {
   cass_statement_bind_int32(statement, 0, 2);
   
   // Create vector with smallint values
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_SMALL_INT, 3);
   cass_vector_append_int16(vector, 10);
   cass_vector_append_int16(vector, 20);
   cass_vector_append_int16(vector, 30);
@@ -204,7 +204,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, TinyintVectors) {
     "INSERT INTO tinyint_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_TINY_INT, 3);
   cass_vector_append_int8(vector, 10);
   cass_vector_append_int8(vector, -20);
   cass_vector_append_int8(vector, 127); // max int8
@@ -238,7 +238,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, FloatVectors) {
     "INSERT INTO float_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
   cass_vector_append_float(vector, 1.5f);
   cass_vector_append_float(vector, -2.5f);
   cass_vector_append_float(vector, 3.14159f);
@@ -272,7 +272,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, DoubleVectors) {
     "INSERT INTO double_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_DOUBLE, 3);
   cass_vector_append_double(vector, 1.5);
   cass_vector_append_double(vector, -2.5);
   cass_vector_append_double(vector, 3.141592653589793);
@@ -306,7 +306,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, BooleanVectors) {
     "INSERT INTO boolean_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(4);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_BOOLEAN, 4);
   cass_vector_append_bool(vector, cass_true);
   cass_vector_append_bool(vector, cass_false);
   cass_vector_append_bool(vector, cass_false);
@@ -341,7 +341,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, TextVectors) {
     "INSERT INTO text_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_TEXT, 3);
   cass_vector_append_string(vector, "hello");
   cass_vector_append_string(vector, "world");
   cass_vector_append_string(vector, "test");
@@ -375,7 +375,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, AsciiVectors) {
     "INSERT INTO ascii_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_ASCII, 3);
   cass_vector_append_string(vector, "ASCII1");
   cass_vector_append_string(vector, "ASCII2");
   cass_vector_append_string(vector, "ASCII3");
@@ -409,7 +409,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, VarcharVectors) {
     "INSERT INTO varchar_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_VARCHAR, 3);
   cass_vector_append_string(vector, "var1");
   cass_vector_append_string(vector, "var2");
   cass_vector_append_string(vector, "var3");
@@ -449,7 +449,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, UuidVectors) {
   cass_uuid_gen_random(uuid_gen, &uuid2);
   cass_uuid_gen_free(uuid_gen);
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_UUID, 2);
   cass_vector_append_uuid(vector, uuid1);
   cass_vector_append_uuid(vector, uuid2);
   
@@ -499,7 +499,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, TimeuuidVectors) {
   cass_uuid_gen_time(uuid_gen, &uuid2);
   cass_uuid_gen_free(uuid_gen);
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_UUID, 2);
   cass_vector_append_uuid(vector, uuid1);
   cass_vector_append_uuid(vector, uuid2);
   
@@ -534,7 +534,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, InetVectors) {
   cass_inet_from_string("192.168.1.1", &inet2);
   cass_inet_from_string("::1", &inet3); // IPv6
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_INET, 3);
   
   // Driver should return error for inet vector elements
   CassError rc = cass_vector_append_inet(vector, inet1);
@@ -566,7 +566,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, BlobVectors) {
   const cass_byte_t blob2[] = {0xFF, 0xFE, 0xFD};
   const cass_byte_t blob3[] = {0xAA, 0xBB};
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_BLOB, 3);
   cass_vector_append_bytes(vector, blob1, sizeof(blob1));
   cass_vector_append_bytes(vector, blob2, sizeof(blob2));
   cass_vector_append_bytes(vector, blob3, sizeof(blob3));
@@ -605,7 +605,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, DecimalVectors) {
   const cass_byte_t varint1[] = {0x30, 0x39}; // 12345 in varint encoding
   const cass_byte_t varint2[] = {0x01, 0x86, 0xA0}; // 100000 in varint encoding
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_DECIMAL, 2);
   cass_vector_append_decimal(vector, varint1, sizeof(varint1), 2);
   cass_vector_append_decimal(vector, varint2, sizeof(varint2), 3);
   
@@ -635,7 +635,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, DurationVectors) {
   // Table creation succeeds but driver blocks duration vector operations
   session_.execute("CREATE TABLE duration_vectors (id int PRIMARY KEY, vec vector<duration, 2>)");
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_DURATION, 2);
   
   // Driver should return error for duration vector elements
   CassError rc = cass_vector_append_duration(vector, 1, 2, 3000000000LL); // 1 month, 2 days, 3 seconds in nanos
@@ -786,7 +786,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, ListVectors) {
   cass_collection_append_int32(list2, 10);
   cass_collection_append_int32(list2, 20);
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_LIST, 2);
   
   // Verify that appending collections returns an error
   CassError append_rc = cass_vector_append_collection(vector, list1);
@@ -833,7 +833,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, SetVectors) {
   cass_collection_append_int32(set2, 10);
   cass_collection_append_int32(set2, 20);
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_SET, 2);
   
   // Driver should return error for set vector elements
   CassError rc = cass_vector_append_collection(vector, set1);
@@ -872,7 +872,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, MapVectors) {
   cass_collection_append_int32(map2, 10);
   cass_collection_append_string(map2, "ten");
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_MAP, 2);
   
   // Driver should return error for map vector elements
   CassError rc = cass_vector_append_collection(vector, map1);
@@ -909,7 +909,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, TupleVectors) {
   cass_tuple_set_int32(tuple2, 0, 2);
   cass_tuple_set_string(tuple2, 1, "second");
   
-  CassVector* vector = cass_vector_new(2);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_TUPLE, 2);
   
   // Driver should return error for tuple vector elements
   CassError rc = cass_vector_append_tuple(vector, tuple1);
@@ -938,20 +938,20 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, VectorOfVectors) {
   }
   
   // Create inner vectors to test driver blocking
-  CassVector* inner1 = cass_vector_new(2);
+  CassVector* inner1 = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
   cass_vector_append_int32(inner1, 1);
   cass_vector_append_int32(inner1, 2);
   
-  CassVector* inner2 = cass_vector_new(2);
+  CassVector* inner2 = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
   cass_vector_append_int32(inner2, 3);
   cass_vector_append_int32(inner2, 4);
   
-  CassVector* inner3 = cass_vector_new(2);
+  CassVector* inner3 = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
   cass_vector_append_int32(inner3, 5);
   cass_vector_append_int32(inner3, 6);
   
   // Create outer vector
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_VECTOR, 3);
   
   // Driver should return error for vector vector elements
   CassError rc = cass_vector_append_vector(vector, inner1);
@@ -999,34 +999,43 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, PreparedStatementsAllTypes)
     CassStatement* bound = cass_prepared_bind(prepared);
     cass_statement_bind_int32(bound, 0, 1);
     
-    CassVector* vector = cass_vector_new(2);
+    CassVector* vector = nullptr;
     
-    // Add type-specific values
+    // Create vector with appropriate type and add type-specific values
     if (type == "float") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 2);
       cass_vector_append_float(vector, 1.5f);
       cass_vector_append_float(vector, 2.5f);
     } else if (type == "double") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_DOUBLE, 2);
       cass_vector_append_double(vector, 1.5);
       cass_vector_append_double(vector, 2.5);
     } else if (type == "int") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
       cass_vector_append_int32(vector, 10);
       cass_vector_append_int32(vector, 20);
     } else if (type == "bigint") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_BIGINT, 2);
       cass_vector_append_int64(vector, 100LL);
       cass_vector_append_int64(vector, 200LL);
     } else if (type == "smallint") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_SMALL_INT, 2);
       cass_vector_append_int16(vector, 10);
       cass_vector_append_int16(vector, 20);
     } else if (type == "tinyint") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_TINY_INT, 2);
       cass_vector_append_int8(vector, 1);
       cass_vector_append_int8(vector, 2);
     } else if (type == "boolean") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_BOOLEAN, 2);
       cass_vector_append_bool(vector, cass_true);
       cass_vector_append_bool(vector, cass_false);
     } else if (type == "text") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_TEXT, 2);
       cass_vector_append_string(vector, "hello");
       cass_vector_append_string(vector, "world");
     } else if (type == "uuid") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_UUID, 2);
       CassUuidGen* uuid_gen = cass_uuid_gen_new();
       CassUuid uuid1, uuid2;
       cass_uuid_gen_random(uuid_gen, &uuid1);
@@ -1035,11 +1044,14 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllDataTypesTest, PreparedStatementsAllTypes)
       cass_vector_append_uuid(vector, uuid1);
       cass_vector_append_uuid(vector, uuid2);
     } else if (type == "blob") {
+      vector = cass_vector_new(CASS_VALUE_TYPE_BLOB, 2);
       const cass_byte_t blob1[] = {0x01, 0x02};
       const cass_byte_t blob2[] = {0x03, 0x04};
       cass_vector_append_bytes(vector, blob1, sizeof(blob1));
       cass_vector_append_bytes(vector, blob2, sizeof(blob2));
     }
+    
+    ASSERT_NE(nullptr, vector) << "Failed to create vector for type: " << type;
     
     cass_statement_bind_vector(bound, 1, vector);
     cass_vector_free(vector);

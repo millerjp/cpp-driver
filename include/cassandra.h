@@ -8254,19 +8254,21 @@ cass_tuple_set_user_type(CassTuple* tuple,
  ***********************************************************************************/
 
 /**
- * Creates a new vector with the specified dimension.
+ * Creates a new vector with the specified element type and dimension.
  *
  * @cassandra{5.0+}
  *
  * @public @memberof CassVector
  *
+ * @param[in] element_type The type of elements in the vector
  * @param[in] dimension The number of elements in the vector
- * @return Returns a vector that must be freed.
+ * @return Returns a vector that must be freed, or NULL if the element type
+ *         is not supported or dimension is invalid.
  *
  * @see cass_vector_free()
  */
 CASS_EXPORT CassVector*
-cass_vector_new(size_t dimension);
+cass_vector_new(CassValueType element_type, size_t dimension);
 
 /**
  * Creates a new vector from an existing data type.

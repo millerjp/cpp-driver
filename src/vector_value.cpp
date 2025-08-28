@@ -26,10 +26,58 @@
 #include <cassert>
 #include <cstdio>
 
+namespace {
+
+bool is_supported_vector_element_type(CassValueType type) {
+  switch (type) {
+    // Supported numeric types
+    case CASS_VALUE_TYPE_BOOLEAN:
+    case CASS_VALUE_TYPE_TINY_INT:
+    case CASS_VALUE_TYPE_SMALL_INT:
+    case CASS_VALUE_TYPE_INT:
+    case CASS_VALUE_TYPE_BIGINT:
+    case CASS_VALUE_TYPE_FLOAT:
+    case CASS_VALUE_TYPE_DOUBLE:
+    // Supported string types
+    case CASS_VALUE_TYPE_TEXT:
+    case CASS_VALUE_TYPE_VARCHAR:
+    case CASS_VALUE_TYPE_ASCII:
+    // Supported UUID types
+    case CASS_VALUE_TYPE_UUID:
+    case CASS_VALUE_TYPE_TIMEUUID:
+    // Supported time types
+    case CASS_VALUE_TYPE_TIMESTAMP:
+    case CASS_VALUE_TYPE_DATE:
+    case CASS_VALUE_TYPE_TIME:
+    // Supported binary types
+    case CASS_VALUE_TYPE_BLOB:
+    // Supported arbitrary precision types
+    case CASS_VALUE_TYPE_DECIMAL:
+    case CASS_VALUE_TYPE_VARINT:
+      return true;
+    default:
+      return false;
+  }
+}
+
+const size_t MAX_VECTOR_DIMENSION = 65536;
+
+} // anonymous namespace
+
 extern "C" {
 
-CassVector* cass_vector_new(size_t dimension) {
-  return CassVector::to(new datastax::internal::core::VectorValue(dimension));
+CassVector* cass_vector_new(CassValueType element_type, size_t dimension) {
+  if (dimension == 0 || dimension > MAX_VECTOR_DIMENSION) {
+    LOG_ERROR("Invalid vector dimension: %zu", dimension);
+    return NULL;
+  }
+  
+  if (!is_supported_vector_element_type(element_type)) {
+    LOG_ERROR("Unsupported vector element type: %d", element_type);
+    return NULL;
+  }
+  
+  return CassVector::to(new datastax::internal::core::VectorValue(element_type, dimension));
 }
 
 CassVector* cass_vector_new_from_data_type(const CassDataType* data_type) {
@@ -147,17 +195,31 @@ CassError VectorValue::check_append() {
   return CASS_OK;
 }
 
+CassError VectorValue::check_element_type(CassValueType expected_type) const {
+  const VectorType* vec_type = static_cast<const VectorType*>(data_type_.get());
+  
+  if (!vec_type->element_type()) {
+    LOG_ERROR("Vector element type is not set");
+    return CASS_ERROR_LIB_NULL_VALUE;
+  }
+  
+  if (vec_type->element_type()->value_type() != expected_type) {
+    LOG_ERROR("Type mismatch: vector expects type %d but got type %d",
+              vec_type->element_type()->value_type(), expected_type);
+    return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+  }
+  
+  return CASS_OK;
+}
+
 // Fixed-size type implementations
 CassError VectorValue::append_bool(cass_bool_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_BOOLEAN)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_BOOLEAN);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -165,13 +227,10 @@ CassError VectorValue::append_bool(cass_bool_t value) {
 CassError VectorValue::append_int8(cass_int8_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_TINY_INT)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_TINY_INT);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -179,13 +238,10 @@ CassError VectorValue::append_int8(cass_int8_t value) {
 CassError VectorValue::append_int16(cass_int16_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_SMALL_INT)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_SMALL_INT);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -193,13 +249,10 @@ CassError VectorValue::append_int16(cass_int16_t value) {
 CassError VectorValue::append_int32(cass_int32_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_INT)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_INT);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -207,13 +260,10 @@ CassError VectorValue::append_int32(cass_int32_t value) {
 CassError VectorValue::append_int64(cass_int64_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_BIGINT)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_BIGINT);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -221,13 +271,10 @@ CassError VectorValue::append_int64(cass_int64_t value) {
 CassError VectorValue::append_float(cass_float_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_FLOAT)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_FLOAT);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -235,13 +282,10 @@ CassError VectorValue::append_float(cass_float_t value) {
 CassError VectorValue::append_double(cass_double_t value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_DOUBLE)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_DOUBLE);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -249,13 +293,10 @@ CassError VectorValue::append_double(cass_double_t value) {
 CassError VectorValue::append_uuid(CassUuid value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_UUID)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_UUID);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode(value));
   return CASS_OK;
 }
@@ -270,13 +311,18 @@ CassError VectorValue::append_inet(CassInet value) {
 CassError VectorValue::append_string(CassString value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_TEXT)));
-    }
+  
+  // Check if element type is one of the string types
+  const VectorType* vec_type = static_cast<const VectorType*>(data_type_.get());
+  CassValueType element_type = vec_type->element_type()->value_type();
+  
+  if (element_type != CASS_VALUE_TYPE_TEXT &&
+      element_type != CASS_VALUE_TYPE_VARCHAR &&
+      element_type != CASS_VALUE_TYPE_ASCII) {
+    LOG_ERROR("Type mismatch: vector expects type %d but got string type", element_type);
+    return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
   }
+  
   items_.push_back(core::encode_with_length(value));
   return CASS_OK;
 }
@@ -284,13 +330,10 @@ CassError VectorValue::append_string(CassString value) {
 CassError VectorValue::append_bytes(CassBytes value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_BLOB)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_BLOB);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode_with_length(value));
   return CASS_OK;
 }
@@ -298,13 +341,10 @@ CassError VectorValue::append_bytes(CassBytes value) {
 CassError VectorValue::append_decimal(CassDecimal value) {
   CassError rc = check_append();
   if (rc != CASS_OK) return rc;
-  // Set element type on first append
-  if (items_.empty() && data_type_->value_type() == CASS_VALUE_TYPE_VECTOR) {
-    VectorType* vec_type = const_cast<VectorType*>(static_cast<const VectorType*>(data_type_.get()));
-    if (!vec_type->element_type()) {
-      vec_type->set_element_type(DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_DECIMAL)));
-    }
-  }
+  
+  rc = check_element_type(CASS_VALUE_TYPE_DECIMAL);
+  if (rc != CASS_OK) return rc;
+  
   items_.push_back(core::encode_with_length(value));
   return CASS_OK;
 }

@@ -21,30 +21,26 @@ TEST(VectorEncodingTest, SmallintVectorHasLengthPrefixes) {
   // Get encoded buffer
   Buffer encoded = vector.encode();
   
-  // Should be 12 bytes: 3 * (2 byte length prefix + 2 byte value)
-  ASSERT_EQ(12u, encoded.size());
+  // Should be 9 bytes: 3 * (1 byte uvint length prefix + 2 byte value)
+  // uvint encoding of 2 is just 0x02
+  ASSERT_EQ(9u, encoded.size());
   
   const char* data = encoded.data();
   
-  // Check length prefixes (00 02 for 2-byte values)
-  EXPECT_EQ(0x00, data[0]);
-  EXPECT_EQ(0x02, data[1]);
-  
-  EXPECT_EQ(0x00, data[4]);
-  EXPECT_EQ(0x02, data[5]);
-  
-  EXPECT_EQ(0x00, data[8]);
-  EXPECT_EQ(0x02, data[9]);
+  // Check length prefixes (uvint encoding of 2 for 2-byte values)
+  EXPECT_EQ(0x02, data[0]);  // uvint(2)
+  EXPECT_EQ(0x02, data[3]);  // uvint(2)
+  EXPECT_EQ(0x02, data[6]);  // uvint(2)
   
   // Check actual values
-  EXPECT_EQ((char)0x80, data[2]); // -32768 high byte
-  EXPECT_EQ((char)0x00, data[3]); // -32768 low byte
+  EXPECT_EQ((char)0x80, data[1]); // -32768 high byte
+  EXPECT_EQ((char)0x00, data[2]); // -32768 low byte
   
-  EXPECT_EQ((char)0x00, data[6]); // 0 high byte
-  EXPECT_EQ((char)0x00, data[7]); // 0 low byte
+  EXPECT_EQ((char)0x00, data[4]); // 0 high byte
+  EXPECT_EQ((char)0x00, data[5]); // 0 low byte
   
-  EXPECT_EQ((char)0x7f, data[10]); // 32767 high byte
-  EXPECT_EQ((char)0xff, data[11]); // 32767 low byte
+  EXPECT_EQ((char)0x7f, data[7]); // 32767 high byte
+  EXPECT_EQ((char)0xff, data[8]); // 32767 low byte
 }
 
 TEST(VectorEncodingTest, TinyintVectorHasLengthPrefixes) {
@@ -63,25 +59,21 @@ TEST(VectorEncodingTest, TinyintVectorHasLengthPrefixes) {
   // Get encoded buffer
   Buffer encoded = vector.encode();
   
-  // Should be 9 bytes: 3 * (2 byte length prefix + 1 byte value)
-  ASSERT_EQ(9u, encoded.size());
+  // Should be 6 bytes: 3 * (1 byte uvint length prefix + 1 byte value)
+  // uvint encoding of 1 is just 0x01
+  ASSERT_EQ(6u, encoded.size());
   
   const char* data = encoded.data();
   
-  // Check length prefixes (00 01 for 1-byte values)
-  EXPECT_EQ(0x00, data[0]);
-  EXPECT_EQ(0x01, data[1]);
-  
-  EXPECT_EQ(0x00, data[3]);
-  EXPECT_EQ(0x01, data[4]);
-  
-  EXPECT_EQ(0x00, data[6]);
-  EXPECT_EQ(0x01, data[7]);
+  // Check length prefixes (uvint encoding of 1 for 1-byte values)
+  EXPECT_EQ(0x01, data[0]);  // uvint(1)
+  EXPECT_EQ(0x01, data[2]);  // uvint(1)
+  EXPECT_EQ(0x01, data[4]);  // uvint(1)
   
   // Check actual values
-  EXPECT_EQ((char)0x80, data[2]); // -128
-  EXPECT_EQ((char)0x00, data[5]); // 0
-  EXPECT_EQ((char)0x7f, data[8]); // 127
+  EXPECT_EQ((char)0x80, data[1]); // -128
+  EXPECT_EQ((char)0x00, data[3]); // 0
+  EXPECT_EQ((char)0x7f, data[5]); // 127
 }
 
 TEST(VectorEncodingTest, IntVectorHasNoLengthPrefixes) {

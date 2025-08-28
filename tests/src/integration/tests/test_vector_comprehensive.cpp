@@ -181,7 +181,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, BasicCRUD) {
     "INSERT INTO crud_test (id, data) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
   cass_vector_append_float(vector, 1.0f);
   cass_vector_append_float(vector, 2.0f);
   cass_vector_append_float(vector, 3.0f);
@@ -330,7 +330,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, DimensionLimits) {
     "INSERT INTO dim_1 (id, v) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(1);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 1);
   cass_vector_append_float(vector, 42.0f);
   cass_statement_bind_vector(statement, 1, vector);
   cass_vector_free(vector);
@@ -349,7 +349,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, DimensionLimits) {
     "INSERT INTO dim_1024 (id, v) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  vector = cass_vector_new(1024);
+  vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 1024);
   for (int i = 0; i < 1024; ++i) {
     cass_vector_append_float(vector, i * 0.001f);
   }
@@ -432,7 +432,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, PreparedStatements) {
     CassStatement* bound = cass_prepared_bind(prepared);
     cass_statement_bind_int32(bound, 0, i);
     
-    CassVector* vector = cass_vector_new(3);
+    CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
     cass_vector_append_float(vector, i * 1.0f);
     cass_vector_append_float(vector, i * 2.0f);
     cass_vector_append_float(vector, i * 3.0f);
@@ -476,7 +476,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, BatchOperations) {
       "INSERT INTO batch_test (id, vec) VALUES (?, ?)", 2);
     cass_statement_bind_int32(statement, 0, i);
     
-    CassVector* vector = cass_vector_new(2);
+    CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 2);
     cass_vector_append_float(vector, i * 0.1f);
     cass_vector_append_float(vector, i * 0.2f);
     

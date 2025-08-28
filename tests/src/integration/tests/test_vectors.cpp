@@ -98,7 +98,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorTest, InsertVector) {
     "INSERT INTO test_vectors (id, vec) VALUES (?, ?)", 2);
   cass_statement_bind_int32(statement, 0, 1);
   
-  CassVector* vector = cass_vector_new(3);
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
   cass_vector_append_float(vector, 1.0f);
   cass_vector_append_float(vector, 2.0f);
   cass_vector_append_float(vector, 3.0f);
@@ -242,7 +242,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorTest, VectorIndex) {
     cass_statement_bind_int32(statement, 0, i);
     cass_statement_bind_string(statement, 1, names[i]);
     
-    CassVector* vector = cass_vector_new(3);
+    CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
     for (int j = 0; j < 3; ++j) {
       cass_vector_append_float(vector, embeddings[i][j]);
     }

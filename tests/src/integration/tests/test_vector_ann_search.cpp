@@ -203,14 +203,14 @@ CASSANDRA_INTEGRATION_TEST_F(VectorANNSearchTest, CyclingCommentsExample) {
     
     CassStatement* statement = cass_statement_new(
       "INSERT INTO cycling_comments_vs (record_id, id, commenter, comment, comment_vector, created_at) "
-      "VALUES (?, ?, ?, ?, ?, toTimestamp(now()))", 6);
+      "VALUES (?, ?, ?, ?, ?, toTimestamp(now()))", 5);
     
     cass_statement_bind_uuid(statement, 0, record_uuid);
     cass_statement_bind_uuid(statement, 1, id_uuid);
     cass_statement_bind_string(statement, 2, comments[i].commenter);
     cass_statement_bind_string(statement, 3, comments[i].comment);
     
-    CassVector* vector = cass_vector_new(5);
+    CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 5);
     for (int j = 0; j < 5; ++j) {
       cass_vector_append_float(vector, comments[i].vector[j]);
     }
@@ -455,7 +455,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorANNSearchTest, ANNSearchWithFiltering) {
     cass_statement_bind_string(statement, 2, product.category);
     cass_statement_bind_int32(statement, 3, product.price);
     
-    CassVector* vector = cass_vector_new(4);
+    CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 4);
     for (int i = 0; i < 4; ++i) {
       cass_vector_append_float(vector, product.vector[i]);
     }
