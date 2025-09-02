@@ -1,0 +1,212 @@
+/*
+  Copyright (c) DataStax, Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+#include "cass_vector.hpp"
+#include "collection.hpp"
+#include "constants.hpp"
+#include "external.hpp"
+#include "macros.hpp"
+#include "tuple.hpp"
+#include "user_type_value.hpp"
+
+#include <string.h>
+
+using namespace datastax;
+using namespace datastax::internal::core;
+
+extern "C" {
+
+CassVector* cass_vector_new(const CassDataType* element_type, size_t dimension) {
+  if (!element_type || dimension == 0 || dimension > 8192) {
+    return NULL;
+  }
+  CassandraVector* vector = new CassandraVector(DataType::ConstPtr(element_type), dimension);
+  vector->inc_ref();
+  return CassVector::to(vector);
+}
+
+CassVector* cass_vector_new_from_data_type(const CassDataType* data_type) {
+  if (!data_type || !data_type->is_custom()) {
+    return NULL;
+  }
+  
+  const CustomType* custom = static_cast<const CustomType*>(data_type);
+  VectorType::ConstPtr vector_type = VectorType::from_class_name(custom->class_name());
+  if (!vector_type) {
+    return NULL;
+  }
+  
+  CassandraVector* vector = new CassandraVector(vector_type);
+  vector->inc_ref();
+  return CassVector::to(vector);
+}
+
+void cass_vector_free(CassVector* vector) { 
+  vector->dec_ref(); 
+}
+
+const CassDataType* cass_vector_data_type(const CassVector* vector) {
+  return CassDataType::to(vector->data_type().get());
+}
+
+size_t cass_vector_dimension(const CassVector* vector) {
+  return vector->dimension();
+}
+
+#define CASS_VECTOR_APPEND(Name, Params, Value)                         \
+  CassError cass_vector_append_##Name(CassVector* vector Params) {      \
+    return vector->append(Value);                                       \
+  }
+
+CASS_VECTOR_APPEND(null, ZERO_PARAMS_(), CassNull())
+CASS_VECTOR_APPEND(int8, ONE_PARAM_(cass_int8_t value), value)
+CASS_VECTOR_APPEND(int16, ONE_PARAM_(cass_int16_t value), value)
+CASS_VECTOR_APPEND(int32, ONE_PARAM_(cass_int32_t value), value)
+CASS_VECTOR_APPEND(uint32, ONE_PARAM_(cass_uint32_t value), value)
+CASS_VECTOR_APPEND(int64, ONE_PARAM_(cass_int64_t value), value)
+CASS_VECTOR_APPEND(float, ONE_PARAM_(cass_float_t value), value)
+CASS_VECTOR_APPEND(double, ONE_PARAM_(cass_double_t value), value)
+CASS_VECTOR_APPEND(bool, ONE_PARAM_(cass_bool_t value), value)
+CASS_VECTOR_APPEND(uuid, ONE_PARAM_(CassUuid value), value)
+CASS_VECTOR_APPEND(inet, ONE_PARAM_(CassInet value), value)
+CASS_VECTOR_APPEND(collection, ONE_PARAM_(const CassCollection* value), value)
+CASS_VECTOR_APPEND(tuple, ONE_PARAM_(const CassTuple* value), value)
+CASS_VECTOR_APPEND(user_type, ONE_PARAM_(const CassUserType* value), value)
+CASS_VECTOR_APPEND(vector, ONE_PARAM_(const CassVector* value), value)
+CASS_VECTOR_APPEND(bytes, TWO_PARAMS_(const cass_byte_t* value, size_t value_size),
+                   CassBytes(value, value_size))
+CASS_VECTOR_APPEND(decimal,
+                   THREE_PARAMS_(const cass_byte_t* varint, size_t varint_size, int scale),
+                   CassDecimal(varint, varint_size, scale))
+CASS_VECTOR_APPEND(duration,
+                   THREE_PARAMS_(cass_int32_t months, cass_int32_t days, cass_int64_t nanos),
+                   CassDuration(months, days, nanos))
+
+#undef CASS_VECTOR_APPEND
+
+CassError cass_vector_append_string(CassVector* vector, const char* value) {
+  return vector->append(CassString(value, SAFE_STRLEN(value)));
+}
+
+CassError cass_vector_append_string_n(CassVector* vector, const char* value, size_t value_length) {
+  return vector->append(CassString(value, value_length));
+}
+
+CassError cass_vector_append_custom(CassVector* vector, const char* class_name,
+                                    const cass_byte_t* value, size_t value_size) {
+  return vector->append(CassCustom(StringRef(class_name), value, value_size));
+}
+
+CassError cass_vector_append_custom_n(CassVector* vector, const char* class_name,
+                                      size_t class_name_length, const cass_byte_t* value,
+                                      size_t value_size) {
+  return vector->append(CassCustom(StringRef(class_name, class_name_length), value, value_size));
+}
+
+} // extern "C"
+
+namespace datastax { namespace internal { namespace core {
+
+CassError CassandraVector::append(CassNull value) {
+  // Vectors don't support null elements
+  return CASS_ERROR_LIB_NULL_VALUE;
+}
+
+CassError CassandraVector::append(const Collection* value) {
+  CASS_VECTOR_CHECK_DIMENSION();
+  CASS_VECTOR_CHECK_TYPE(value);
+  elements_.push_back(value->encode());
+  return CASS_OK;
+}
+
+CassError CassandraVector::append(const Tuple* value) {
+  CASS_VECTOR_CHECK_DIMENSION();
+  CASS_VECTOR_CHECK_TYPE(value);
+  elements_.push_back(value->encode());
+  return CASS_OK;
+}
+
+CassError CassandraVector::append(const UserTypeValue* value) {
+  CASS_VECTOR_CHECK_DIMENSION();
+  CASS_VECTOR_CHECK_TYPE(value);
+  elements_.push_back(value->encode());
+  return CASS_OK;
+}
+
+CassError CassandraVector::append(const CassandraVector* value) {
+  CASS_VECTOR_CHECK_DIMENSION();
+  CASS_VECTOR_CHECK_TYPE(value);
+  elements_.push_back(value->encode());
+  return CASS_OK;
+}
+
+size_t CassandraVector::get_elements_size() const {
+  size_t total_size = 0;
+  bool is_fixed_length = vector_type_->is_fixed_length_element();
+  
+  for (size_t i = 0; i < elements_.size(); ++i) {
+    const Buffer& element = elements_[i];
+    if (!is_fixed_length) {
+      // Variable-length elements need UVINT size prefix
+      total_size += uvint_size(element.size());
+    }
+    total_size += element.size();
+  }
+  
+  return total_size;
+}
+
+void CassandraVector::encode_elements(char* buf) const {
+  bool is_fixed_length = vector_type_->is_fixed_length_element();
+  size_t offset = 0;
+  
+  for (size_t i = 0; i < elements_.size(); ++i) {
+    const Buffer& element = elements_[i];
+    
+    if (!is_fixed_length) {
+      // Encode UVINT size prefix for variable-length elements
+      uint8_t* uvint_buf = reinterpret_cast<uint8_t*>(buf + offset);
+      size_t uvint_bytes = encode_uvint(element.size(), uvint_buf);
+      offset += uvint_bytes;
+    }
+    
+    // Copy element data
+    memcpy(buf + offset, element.data(), element.size());
+    offset += element.size();
+  }
+}
+
+Buffer CassandraVector::encode() const {
+  size_t size = get_elements_size();
+  Buffer result(size);
+  encode_elements(result.data());
+  return result;
+}
+
+Buffer CassandraVector::encode_with_length() const {
+  size_t elements_size = get_elements_size();
+  Buffer result(sizeof(int32_t) + elements_size);
+  
+  // Encode length prefix
+  result.encode_int32(0, static_cast<int32_t>(elements_size));
+  
+  // Encode elements
+  encode_elements(result.data() + sizeof(int32_t));
+  
+  return result;
+}
+
+}}} // namespace datastax::internal::core
