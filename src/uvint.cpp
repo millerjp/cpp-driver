@@ -46,7 +46,9 @@ size_t uvint_size(uint64_t value) {
   // return (639 - lead0*9) >> 6
   
   int lead0 = leading_zeros_64(value);
-  return static_cast<size_t>((639 - lead0 * 9) >> 6);
+  size_t result = static_cast<size_t>((639 - lead0 * 9) >> 6);
+  // The formula can return 0 for value 0, but we need at least 1 byte
+  return result == 0 ? 1 : result;
 }
 
 size_t encode_uvint(uint64_t value, uint8_t* buffer) {
