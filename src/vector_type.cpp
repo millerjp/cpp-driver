@@ -15,7 +15,7 @@
 */
 
 #include "vector_type.hpp"
-#include <sstream>
+#include "string.hpp"
 #include <cstdlib>
 
 namespace datastax { namespace internal { namespace core {
@@ -143,7 +143,7 @@ DataType::Ptr VectorType::copy() const {
 }
 
 String VectorType::to_string() const {
-  std::ostringstream ss;
+  OStringStream ss;
   ss << "vector<";
   if (element_type_) {
     ss << element_type_->to_string();
@@ -155,7 +155,7 @@ String VectorType::to_string() const {
 }
 
 void VectorType::update_class_name() {
-  std::ostringstream ss;
+  OStringStream ss;
   ss << VECTOR_CLASS_NAME << "(";
   
   // Convert element type to Java class name format

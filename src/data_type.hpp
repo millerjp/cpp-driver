@@ -33,6 +33,7 @@ namespace datastax { namespace internal { namespace core {
 class Collection;
 class Tuple;
 class UserTypeValue;
+class CassandraVector;
 
 inline bool is_int64_type(CassValueType value_type) {
   return value_type == CASS_VALUE_TYPE_BIGINT || value_type == CASS_VALUE_TYPE_COUNTER ||
@@ -559,6 +560,11 @@ struct IsValidDataType<const Tuple*> {
 template <>
 struct IsValidDataType<const UserTypeValue*> {
   bool operator()(const UserTypeValue* value, const DataType::ConstPtr& data_type) const;
+};
+
+template <>
+struct IsValidDataType<const CassandraVector*> {
+  bool operator()(const CassandraVector* value, const DataType::ConstPtr& data_type) const;
 };
 
 }}} // namespace datastax::internal::core

@@ -39,11 +39,11 @@ CassVector* cass_vector_new(const CassDataType* element_type, size_t dimension) 
 }
 
 CassVector* cass_vector_new_from_data_type(const CassDataType* data_type) {
-  if (!data_type || !data_type->is_custom()) {
+  if (!data_type || !data_type->from()->is_custom()) {
     return NULL;
   }
   
-  const CustomType* custom = static_cast<const CustomType*>(data_type);
+  const CustomType* custom = static_cast<const CustomType*>(data_type->from());
   VectorType::ConstPtr vector_type = VectorType::from_class_name(custom->class_name());
   if (!vector_type) {
     return NULL;

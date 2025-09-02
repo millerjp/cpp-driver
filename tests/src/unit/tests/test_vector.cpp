@@ -20,9 +20,11 @@
 #include "vector_type.hpp"
 #include "data_type.hpp"
 #include "encode.hpp"
+#include "string.hpp"
 #include <cstring>
 
 using namespace datastax::internal::core;
+using datastax::String;
 
 class VectorTest : public ::testing::Test {
 protected:
@@ -66,7 +68,7 @@ TEST_F(VectorTest, VectorTypeCreation) {
   EXPECT_TRUE(vec_type.is_fixed_length_element());
   
   // Check class name generation
-  std::string expected = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)";
+  String expected = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)";
   EXPECT_EQ(vec_type.class_name(), expected);
 }
 
@@ -114,7 +116,7 @@ TEST_F(VectorTest, FixedLengthEncoding) {
   // Check the encoded bytes (IEEE 754 format for 1.0, 2.0, 3.0)
   // 1.0f = 0x3F800000, 2.0f = 0x40000000, 3.0f = 0x40400000
   std::string hex = bytes_to_hex(encoded.data(), encoded.size());
-  EXPECT_EQ(hex, "3F80000040000000404000000");  // Big-endian encoding
+  EXPECT_EQ(hex, "3F8000004000000040400000");  // Big-endian encoding
 }
 
 TEST_F(VectorTest, VariableLengthEncoding) {
@@ -237,7 +239,7 @@ TEST_F(VectorTest, VectorTypeToString) {
   EXPECT_EQ(int_vec.to_string(), "vector<int, 10>");
   
   VectorType text_vec(text_type, 5);
-  EXPECT_EQ(text_vec.to_string(), "vector<varchar, 5>");
+  EXPECT_EQ(text_vec.to_string(), "vector<text, 5>");
 }
 
 TEST_F(VectorTest, VectorTypeCopy) {

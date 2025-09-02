@@ -286,6 +286,13 @@ typedef struct CassAggregateMeta_ CassAggregateMeta;
 typedef struct CassCollection_ CassCollection;
 
 /**
+ * A vector of values.
+ *
+ * @struct CassVector
+ */
+typedef struct CassVector_ CassVector;
+
+/**
  * A tuple of values.
  *
  * @struct CassTuple
