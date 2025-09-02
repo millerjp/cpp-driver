@@ -21,6 +21,7 @@
 #include "request.hpp"
 #include "tuple.hpp"
 #include "user_type_value.hpp"
+#include "cass_vector.hpp"
 
 using namespace datastax::internal::core;
 
@@ -46,6 +47,12 @@ CassError AbstractData::set(size_t index, const Tuple* value) {
 }
 
 CassError AbstractData::set(size_t index, const UserTypeValue* value) {
+  CASS_CHECK_INDEX_AND_TYPE(index, value);
+  elements_[index] = value->encode_with_length();
+  return CASS_OK;
+}
+
+CassError AbstractData::set(size_t index, const CassandraVector* value) {
   CASS_CHECK_INDEX_AND_TYPE(index, value);
   elements_[index] = value->encode_with_length();
   return CASS_OK;

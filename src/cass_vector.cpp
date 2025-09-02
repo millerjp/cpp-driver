@@ -29,11 +29,12 @@ using namespace datastax::internal::core;
 
 extern "C" {
 
-CassVector* cass_vector_new(const CassDataType* element_type, size_t dimension) {
-  if (!element_type || dimension == 0 || dimension > 8192) {
+CassVector* cass_vector_new(CassValueType element_type, size_t dimension) {
+  if (dimension == 0 || dimension > 8192) {
     return NULL;
   }
-  CassandraVector* vector = new CassandraVector(DataType::ConstPtr(element_type), dimension);
+  DataType::ConstPtr type(new DataType(element_type));
+  CassandraVector* vector = new CassandraVector(type, dimension);
   vector->inc_ref();
   return CassVector::to(vector);
 }

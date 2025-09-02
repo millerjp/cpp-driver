@@ -17,6 +17,7 @@
 #include "statement.hpp"
 
 #include "collection.hpp"
+#include "cass_vector.hpp"
 #include "execute_request.hpp"
 #include "external.hpp"
 #include "macros.hpp"
@@ -206,6 +207,7 @@ CASS_STATEMENT_BIND(inet, ONE_PARAM_(CassInet value), value)
 CASS_STATEMENT_BIND(collection, ONE_PARAM_(const CassCollection* value), value->from())
 CASS_STATEMENT_BIND(tuple, ONE_PARAM_(const CassTuple* value), value->from())
 CASS_STATEMENT_BIND(user_type, ONE_PARAM_(const CassUserType* value), value->from())
+CASS_STATEMENT_BIND(vector, ONE_PARAM_(const CassVector* value), value->from())
 CASS_STATEMENT_BIND(bytes, TWO_PARAMS_(const cass_byte_t* value, size_t value_size),
                     CassBytes(value, value_size))
 CASS_STATEMENT_BIND(decimal,

@@ -18,8 +18,8 @@
 - [x] Add complex types (tuples, UDTs) ✅ 2025-09-02
 
 ### Phase 4: Integration
-- [ ] Add cass_statement_bind_vector() API
-- [ ] Add cass_value_get_vector() API  
+- [x] Add cass_statement_bind_vector() API ✅ 2025-09-02
+- [x] Add cass_iterator_from_vector() API ✅ 2025-09-02  
 - [ ] Parse vector type strings from schema
 - [ ] Cross-validate with Go driver
 
@@ -448,3 +448,48 @@ Implemented and validated serialization for ALL primitive Cassandra types in vec
 - UDTs follow same encoding pattern as tuples
 
 **Phase 3 Complete**: All types (primitives, collections, tuples, UDTs) now supported in vectors
+
+### Session 7: Statement Binding API (Phase 4A) (2025-09-02)
+
+#### Component: Statement Binding and Iterator APIs
+
+**Files Modified:**
+1. `/src/statement.cpp` - Added CASS_STATEMENT_BIND macro for vectors
+2. `/include/cassandra.h` - Added public API declarations for:
+   - `cass_statement_bind_vector()` family
+   - `cass_vector_*()` creation and append functions
+   - `cass_iterator_from_vector()` for reading
+3. `/src/abstract_data.hpp` - Added CassandraVector support to set methods
+4. `/src/abstract_data.cpp` - Implemented set method for CassandraVector
+5. `/src/cass_vector.cpp` - Fixed cass_vector_new to take CassValueType
+
+**Implementation Details:**
+
+**Binding API Pattern**:
+- Used existing CASS_STATEMENT_BIND macro pattern
+- Auto-generates: `cass_statement_bind_vector()`, `bind_vector_by_name()`, `bind_vector_by_name_n()`
+- Leverages External<> template's `from()` method for type conversion
+- Works for both simple and prepared statements
+
+**Key Discovery**:
+- Driver uses SAME binding functions for simple and prepared statements
+- Collections pattern: `CASS_STATEMENT_BIND(collection, ONE_PARAM_(const CassCollection* value), value->from())`
+- Applied same pattern for vectors
+
+**Public API Added**:
+1. **Creation**: `cass_vector_new(element_type, dimension)`
+2. **Append Functions**: Full family matching collections (int8, int16, int32, float, double, string, etc.)
+3. **Binding**: Statement binding functions for positional and named parameters
+4. **Reading**: `cass_iterator_from_vector()` for iterating elements
+
+**Design Decisions**:
+1. **Iterator pattern for reading**: Following collection/tuple pattern, not direct get
+2. **CassValueType parameter**: Changed from CassDataType* to match simpler API
+3. **Consistent naming**: All functions follow cass_vector_* pattern
+
+**Build Status**: ✅ Compiles successfully with all changes
+
+**Next Steps**:
+- Implement actual iterator backend for cass_iterator_from_vector()
+- Add schema parsing for vector type strings
+- Integration testing with actual queries
