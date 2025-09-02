@@ -22,6 +22,8 @@
 #include "encode.hpp"
 #include "string.hpp"
 #include "collection.hpp"
+#include "tuple.hpp"
+#include "user_type_value.hpp"
 #include <cstring>
 
 using namespace datastax::internal::core;
@@ -399,4 +401,81 @@ TEST_F(VectorTest, MapInVector) {
   // Check UVINT prefixes
   EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x1e);  // UVINT(30) for first map
   EXPECT_EQ(static_cast<uint8_t>(encoded.data()[31]), 0x11); // UVINT(17) for second map
+}
+
+TEST_F(VectorTest, TupleInVector) {
+  // Test vector<tuple<int, text>, 2> with [(1, "a"), (2, "bc")]
+  DataType::Vec tuple_types;
+  tuple_types.push_back(int_type);
+  tuple_types.push_back(text_type);
+  TupleType::ConstPtr tuple_type(new TupleType(tuple_types, false));
+  
+  CassandraVector vec(tuple_type, 2);
+  
+  // Create first tuple (1, "a")
+  Tuple tuple1{DataType::ConstPtr(tuple_type)};
+  tuple1.set(0, static_cast<cass_int32_t>(1));
+  tuple1.set(1, CassString("a", 1));
+  
+  // Create second tuple (2, "bc")
+  Tuple tuple2{DataType::ConstPtr(tuple_type)};
+  tuple2.set(0, static_cast<cass_int32_t>(2));
+  tuple2.set(1, CassString("bc", 2));
+  
+  // Append tuples to vector
+  EXPECT_EQ(vec.append(&tuple1), CASS_OK);
+  EXPECT_EQ(vec.append(&tuple2), CASS_OK);
+  EXPECT_TRUE(vec.is_full());
+  
+  // Encode and verify
+  Buffer encoded = vec.encode();
+  
+  // Tuple encoding: [int32(field_size) + field_data]*
+  // First tuple (1, "a"): 4 + 4 + 4 + 1 = 13 bytes
+  // Second tuple (2, "bc"): 4 + 4 + 4 + 2 = 14 bytes
+  // With UVINT prefixes: UVINT(13) + 13 + UVINT(14) + 14 = 1 + 13 + 1 + 14 = 29 bytes
+  EXPECT_EQ(encoded.size(), 29u);
+  
+  // Check UVINT prefixes
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x0d);  // UVINT(13) for first tuple
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[14]), 0x0e); // UVINT(14) for second tuple
+}
+
+TEST_F(VectorTest, UDTInVector) {
+  // Test vector<udt, 2> with user type having fields: id (int), name (text)
+  // Create a UserType with two fields
+  UserType::FieldVec fields;
+  fields.push_back(UserType::Field("id", int_type));
+  fields.push_back(UserType::Field("name", text_type));
+  UserType::ConstPtr udt_type(new UserType("test", "my_type", fields, false));
+  
+  CassandraVector vec(udt_type, 2);
+  
+  // Create first UDT {id: 100, name: "alice"}
+  UserTypeValue udt1(udt_type);
+  udt1.set(0, static_cast<cass_int32_t>(100));
+  udt1.set(1, CassString("alice", 5));
+  
+  // Create second UDT {id: 200, name: "bob"}
+  UserTypeValue udt2(udt_type);
+  udt2.set(0, static_cast<cass_int32_t>(200));
+  udt2.set(1, CassString("bob", 3));
+  
+  // Append UDTs to vector
+  EXPECT_EQ(vec.append(&udt1), CASS_OK);
+  EXPECT_EQ(vec.append(&udt2), CASS_OK);
+  EXPECT_TRUE(vec.is_full());
+  
+  // Encode and verify
+  Buffer encoded = vec.encode();
+  
+  // UDT encoding is same as tuple: [int32(field_size) + field_data]*
+  // First UDT {100, "alice"}: 4 + 4 + 4 + 5 = 17 bytes
+  // Second UDT {200, "bob"}: 4 + 4 + 4 + 3 = 15 bytes
+  // With UVINT prefixes: UVINT(17) + 17 + UVINT(15) + 15 = 1 + 17 + 1 + 15 = 34 bytes
+  EXPECT_EQ(encoded.size(), 34u);
+  
+  // Check UVINT prefixes
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x11);  // UVINT(17) for first UDT
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[18]), 0x0f); // UVINT(15) for second UDT
 }
