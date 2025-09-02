@@ -21,6 +21,7 @@
 #include "data_type.hpp"
 #include "encode.hpp"
 #include "string.hpp"
+#include "collection.hpp"
 #include <cstring>
 
 using namespace datastax::internal::core;
@@ -250,4 +251,152 @@ TEST_F(VectorTest, VectorTypeCopy) {
   EXPECT_EQ(vec_copy->dimension(), 3u);
   EXPECT_EQ(vec_copy->element_type(), float_type);
   EXPECT_EQ(vec_copy->class_name(), original.class_name());
+}
+
+TEST_F(VectorTest, ListInVector) {
+  // Test vector<list<int>, 2> with [[1,2], [3,4,5]]
+  DataType::Vec list_types;
+  list_types.push_back(int_type);
+  CollectionType::ConstPtr list_int_type(
+      new CollectionType(static_cast<CassValueType>(CASS_COLLECTION_TYPE_LIST), list_types, false));
+  CassandraVector vec(list_int_type, 2);
+  
+  // Create first list [1,2]
+  Collection list1(list_int_type, 2);
+  list1.append(static_cast<cass_int32_t>(1));
+  list1.append(static_cast<cass_int32_t>(2));
+  
+  // Create second list [3,4,5]
+  Collection list2(list_int_type, 3);
+  list2.append(static_cast<cass_int32_t>(3));
+  list2.append(static_cast<cass_int32_t>(4));
+  list2.append(static_cast<cass_int32_t>(5));
+  
+  // Append lists to vector
+  EXPECT_EQ(vec.append(&list1), CASS_OK);
+  EXPECT_EQ(vec.append(&list2), CASS_OK);
+  EXPECT_TRUE(vec.is_full());
+  
+  // Encode and verify size
+  Buffer encoded = vec.encode();
+  
+  // First list: UVINT(0x14=20) + 4 bytes count + 2*(4 bytes size + 4 bytes int) = 1 + 20 = 21
+  // Second list: UVINT(0x1c=28) + 4 bytes count + 3*(4 bytes size + 4 bytes int) = 1 + 28 = 29
+  // Total: 21 + 29 = 50 bytes
+  EXPECT_EQ(encoded.size(), 50u);
+  
+  // Check UVINT prefixes
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x14);  // UVINT(20) for first list
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[21]), 0x1c); // UVINT(28) for second list
+}
+
+TEST_F(VectorTest, EmptyListInVector) {
+  // Test vector<list<int>, 2> with [[], [42]]
+  DataType::Vec list_types;
+  list_types.push_back(int_type);
+  CollectionType::ConstPtr list_int_type(
+      new CollectionType(static_cast<CassValueType>(CASS_COLLECTION_TYPE_LIST), list_types, false));
+  CassandraVector vec(list_int_type, 2);
+  
+  // Create empty list
+  Collection empty_list(list_int_type, 0);
+  
+  // Create list with single element [42]
+  Collection single_list(list_int_type, 1);
+  single_list.append(static_cast<cass_int32_t>(42));
+  
+  // Append lists to vector
+  EXPECT_EQ(vec.append(&empty_list), CASS_OK);
+  EXPECT_EQ(vec.append(&single_list), CASS_OK);
+  EXPECT_TRUE(vec.is_full());
+  
+  // Encode and verify
+  Buffer encoded = vec.encode();
+  
+  // Empty list: UVINT(0x04=4) + 4 bytes count(0) = 5 bytes
+  // Single list: UVINT(0x0c=12) + 4 bytes count(1) + 4 bytes size + 4 bytes int = 1 + 12 = 13 bytes
+  // Total: 5 + 13 = 18 bytes
+  EXPECT_EQ(encoded.size(), 18u);
+  
+  // Check UVINT prefixes
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x04);  // UVINT(4) for empty list
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[5]), 0x0c);  // UVINT(12) for single element list
+}
+
+TEST_F(VectorTest, SetInVector) {
+  // Test vector<set<int>, 2> with [{1,2}, {3,4,5}]
+  DataType::Vec set_types;
+  set_types.push_back(int_type);
+  CollectionType::ConstPtr set_int_type(
+      new CollectionType(static_cast<CassValueType>(CASS_COLLECTION_TYPE_SET), set_types, false));
+  CassandraVector vec(set_int_type, 2);
+  
+  // Create first set {1,2}
+  Collection set1(set_int_type, 2);
+  set1.append(static_cast<cass_int32_t>(1));
+  set1.append(static_cast<cass_int32_t>(2));
+  
+  // Create second set {3,4,5}
+  Collection set2(set_int_type, 3);
+  set2.append(static_cast<cass_int32_t>(3));
+  set2.append(static_cast<cass_int32_t>(4));
+  set2.append(static_cast<cass_int32_t>(5));
+  
+  // Append sets to vector
+  EXPECT_EQ(vec.append(&set1), CASS_OK);
+  EXPECT_EQ(vec.append(&set2), CASS_OK);
+  EXPECT_TRUE(vec.is_full());
+  
+  // Encode and verify size
+  Buffer encoded = vec.encode();
+  
+  // Same encoding as LIST - count + elements with size prefixes
+  // First set: UVINT(0x14=20) + 4 bytes count + 2*(4 bytes size + 4 bytes int) = 1 + 20 = 21
+  // Second set: UVINT(0x1c=28) + 4 bytes count + 3*(4 bytes size + 4 bytes int) = 1 + 28 = 29
+  // Total: 21 + 29 = 50 bytes
+  EXPECT_EQ(encoded.size(), 50u);
+  
+  // Check UVINT prefixes
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x14);  // UVINT(20) for first set
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[21]), 0x1c); // UVINT(28) for second set
+}
+
+TEST_F(VectorTest, MapInVector) {
+  // Test vector<map<int,text>, 2> with [{1:"a", 2:"b"}, {3:"c"}]
+  DataType::Vec map_types;
+  map_types.push_back(int_type);  // key type
+  map_types.push_back(text_type); // value type
+  CollectionType::ConstPtr map_type(
+      new CollectionType(static_cast<CassValueType>(CASS_COLLECTION_TYPE_MAP), map_types, false));
+  CassandraVector vec(map_type, 2);
+  
+  // Create first map {1:"a", 2:"b"}
+  Collection map1(map_type, 2);
+  map1.append(static_cast<cass_int32_t>(1));  // key
+  map1.append(CassString("a", 1));            // value
+  map1.append(static_cast<cass_int32_t>(2));  // key
+  map1.append(CassString("b", 1));            // value
+  
+  // Create second map {3:"c"}
+  Collection map2(map_type, 1);
+  map2.append(static_cast<cass_int32_t>(3));  // key
+  map2.append(CassString("c", 1));            // value
+  
+  // Append maps to vector
+  EXPECT_EQ(vec.append(&map1), CASS_OK);
+  EXPECT_EQ(vec.append(&map2), CASS_OK);
+  EXPECT_TRUE(vec.is_full());
+  
+  // Encode and verify
+  Buffer encoded = vec.encode();
+  
+  // MAP encoding: int32(count) + [int32(key_size) + key + int32(value_size) + value]*
+  // First map {1:"a", 2:"b"}: count(2) + 4 bytes + 4 + 4 bytes + 1 + 4 bytes + 4 + 4 bytes + 1 = 30 bytes
+  // Second map {3:"c"}: count(1) + 4 bytes + 4 + 4 bytes + 1 = 17 bytes
+  // With UVINT prefixes: UVINT(30) + 30 + UVINT(17) + 17 = 1 + 30 + 1 + 17 = 49 bytes
+  EXPECT_EQ(encoded.size(), 49u);
+  
+  // Check UVINT prefixes
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[0]), 0x1e);  // UVINT(30) for first map
+  EXPECT_EQ(static_cast<uint8_t>(encoded.data()[31]), 0x11); // UVINT(17) for second map
 }
