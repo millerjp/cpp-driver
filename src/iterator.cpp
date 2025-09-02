@@ -65,6 +65,25 @@ CassIterator* cass_iterator_from_map(const CassValue* value) {
   return CassIterator::to(new MapIterator(value));
 }
 
+CassIterator* cass_iterator_from_vector(const CassValue* value) {
+  if (value->is_null()) {
+    return NULL;
+  }
+  // Vectors are CUSTOM types
+  if (value->value_type() != CASS_VALUE_TYPE_CUSTOM) {
+    return NULL;
+  }
+  // Check if it's actually a vector by looking at the class name
+  const DataType* data_type = value->data_type().get();
+  if (data_type && data_type->value_type() == CASS_VALUE_TYPE_CUSTOM) {
+    const CustomType* custom_type = static_cast<const CustomType*>(data_type);
+    if (custom_type->class_name().find("VectorType") != StringRef::npos) {
+      return CassIterator::to(new VectorIterator(value));
+    }
+  }
+  return NULL;
+}
+
 CassIterator* cass_iterator_fields_from_user_type(const CassValue* value) {
   if (value->is_null() || !value->is_user_type()) {
     return NULL;

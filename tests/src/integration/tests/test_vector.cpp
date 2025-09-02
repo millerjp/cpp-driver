@@ -1,0 +1,331 @@
+/*
+  Copyright (c) DataStax, Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+#include "integration.hpp"
+#include <algorithm>
+
+/**
+ * Vector type integration tests for Cassandra 5.0+
+ */
+class VectorIntegrationTest : public Integration {
+public:
+  void SetUp() {
+    Integration::SetUp();
+    
+    // Create test keyspace
+    session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_test "
+                     "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+    session_.execute("USE vector_test");
+  }
+  
+  void TearDown() {
+    // Clean up
+    session_.execute("DROP KEYSPACE IF EXISTS vector_test");
+    Integration::TearDown();
+  }
+};
+
+/**
+ * Test basic vector type with float elements
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, FloatVector) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  // Create table with vector column
+  session_.execute("CREATE TABLE IF NOT EXISTS float_vectors ("
+                   "id int PRIMARY KEY, "
+                   "embedding vector<float, 3>)");
+  
+  // Insert using prepared statement with bound vector
+  Statement insert_stmt("INSERT INTO float_vectors (id, embedding) VALUES (?, ?)");
+  insert_stmt.bind(0, 1);
+  
+  // Create and bind a vector
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
+  ASSERT_NE(vector, nullptr);
+  
+  ASSERT_EQ(cass_vector_append_float(vector, 1.0f), CASS_OK);
+  ASSERT_EQ(cass_vector_append_float(vector, 2.0f), CASS_OK);
+  ASSERT_EQ(cass_vector_append_float(vector, 3.0f), CASS_OK);
+  
+  // Bind the vector to the statement
+  ASSERT_EQ(cass_statement_bind_vector(insert_stmt.get(), 1, vector), CASS_OK);
+  
+  // Execute the insert
+  session_.execute(insert_stmt);
+  
+  // Free the vector
+  cass_vector_free(vector);
+  
+  // Query the data back
+  Result result = session_.execute("SELECT id, embedding FROM float_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
+  
+  Row row = result.first_row();
+  ASSERT_EQ(1, row.column_by_name<Integer>("id").value());
+  
+  // TODO: Once iterator is implemented, verify the vector values
+  // For now, just check that the column exists and is not null
+  ASSERT_FALSE(row.column_by_name<Value>("embedding").is_null());
+  
+  TEST_LOG("Successfully inserted and retrieved float vector");
+}
+
+/**
+ * Test vector with different dimensions
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, DifferentDimensions) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  // Create tables with different vector dimensions
+  session_.execute("CREATE TABLE IF NOT EXISTS vectors_1d (id int PRIMARY KEY, v vector<float, 1>)");
+  session_.execute("CREATE TABLE IF NOT EXISTS vectors_10d (id int PRIMARY KEY, v vector<float, 10>)");
+  session_.execute("CREATE TABLE IF NOT EXISTS vectors_100d (id int PRIMARY KEY, v vector<float, 100>)");
+  
+  // Test 1-dimensional vector
+  {
+    Statement stmt("INSERT INTO vectors_1d (id, v) VALUES (?, ?)");
+    stmt.bind(0, 1);
+    
+    CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 1);
+    ASSERT_EQ(cass_vector_append_float(vec, 42.0f), CASS_OK);
+    ASSERT_EQ(cass_statement_bind_vector(stmt.get(), 1, vec), CASS_OK);
+    session_.execute(stmt);
+    cass_vector_free(vec);
+  }
+  
+  // Test 10-dimensional vector
+  {
+    Statement stmt("INSERT INTO vectors_10d (id, v) VALUES (?, ?)");
+    stmt.bind(0, 1);
+    
+    CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 10);
+    for (int i = 0; i < 10; i++) {
+      ASSERT_EQ(cass_vector_append_float(vec, static_cast<float>(i)), CASS_OK);
+    }
+    ASSERT_EQ(cass_statement_bind_vector(stmt.get(), 1, vec), CASS_OK);
+    session_.execute(stmt);
+    cass_vector_free(vec);
+  }
+  
+  // Test 100-dimensional vector
+  {
+    Statement stmt("INSERT INTO vectors_100d (id, v) VALUES (?, ?)");
+    stmt.bind(0, 1);
+    
+    CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 100);
+    for (int i = 0; i < 100; i++) {
+      ASSERT_EQ(cass_vector_append_float(vec, static_cast<float>(i * 0.1f)), CASS_OK);
+    }
+    ASSERT_EQ(cass_statement_bind_vector(stmt.get(), 1, vec), CASS_OK);
+    session_.execute(stmt);
+    cass_vector_free(vec);
+  }
+  
+  // Verify all inserts succeeded
+  ASSERT_EQ(1ul, session_.execute("SELECT * FROM vectors_1d WHERE id = 1").row_count());
+  ASSERT_EQ(1ul, session_.execute("SELECT * FROM vectors_10d WHERE id = 1").row_count());
+  ASSERT_EQ(1ul, session_.execute("SELECT * FROM vectors_100d WHERE id = 1").row_count());
+  
+  TEST_LOG("Successfully tested vectors with dimensions 1, 10, and 100");
+}
+
+/**
+ * Test vector with integer elements
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, IntegerVector) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  // Create table with int vector
+  session_.execute("CREATE TABLE IF NOT EXISTS int_vectors ("
+                   "id int PRIMARY KEY, "
+                   "values vector<int, 5>)");
+  
+  Statement stmt("INSERT INTO int_vectors (id, values) VALUES (?, ?)");
+  stmt.bind(0, 1);
+  
+  CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_INT, 5);
+  ASSERT_NE(vec, nullptr);
+  
+  // Add some integer values
+  ASSERT_EQ(cass_vector_append_int32(vec, 10), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int32(vec, 20), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int32(vec, 30), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int32(vec, 40), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int32(vec, 50), CASS_OK);
+  
+  ASSERT_EQ(cass_statement_bind_vector(stmt.get(), 1, vec), CASS_OK);
+  session_.execute(stmt);
+  cass_vector_free(vec);
+  
+  // Query back
+  Result result = session_.execute("SELECT * FROM int_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
+  ASSERT_FALSE(result.first_row().column_by_name<Value>("values").is_null());
+  
+  TEST_LOG("Successfully inserted and retrieved integer vector");
+}
+
+/**
+ * Test vector with text elements (variable-length type)
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, TextVector) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  // Create table with text vector
+  session_.execute("CREATE TABLE IF NOT EXISTS text_vectors ("
+                   "id int PRIMARY KEY, "
+                   "words vector<text, 3>)");
+  
+  Statement stmt("INSERT INTO text_vectors (id, words) VALUES (?, ?)");
+  stmt.bind(0, 1);
+  
+  CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_TEXT, 3);
+  ASSERT_NE(vec, nullptr);
+  
+  ASSERT_EQ(cass_vector_append_string(vec, "hello"), CASS_OK);
+  ASSERT_EQ(cass_vector_append_string(vec, "world"), CASS_OK);
+  ASSERT_EQ(cass_vector_append_string(vec, "test"), CASS_OK);
+  
+  ASSERT_EQ(cass_statement_bind_vector(stmt.get(), 1, vec), CASS_OK);
+  session_.execute(stmt);
+  cass_vector_free(vec);
+  
+  // Query back
+  Result result = session_.execute("SELECT * FROM text_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
+  ASSERT_FALSE(result.first_row().column_by_name<Value>("words").is_null());
+  
+  TEST_LOG("Successfully inserted and retrieved text vector");
+}
+
+/**
+ * Test batch insert with vectors
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, BatchInsertVectors) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  session_.execute("CREATE TABLE IF NOT EXISTS batch_vectors ("
+                   "id int PRIMARY KEY, "
+                   "vec vector<float, 2>)");
+  
+  // Create a batch
+  Batch batch(CASS_BATCH_TYPE_LOGGED);
+  
+  // Add multiple statements with vectors
+  for (int i = 1; i <= 5; i++) {
+    Statement stmt("INSERT INTO batch_vectors (id, vec) VALUES (?, ?)");
+    stmt.bind(0, i);
+    
+    CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 2);
+    cass_vector_append_float(vec, static_cast<float>(i));
+    cass_vector_append_float(vec, static_cast<float>(i * 10));
+    
+    cass_statement_bind_vector(stmt.get(), 1, vec);
+    batch.add(stmt);
+    cass_vector_free(vec);
+  }
+  
+  // Execute the batch
+  session_.execute(batch);
+  
+  // Verify all rows were inserted
+  Result result = session_.execute("SELECT COUNT(*) FROM batch_vectors");
+  ASSERT_EQ(1ul, result.row_count());
+  ASSERT_EQ(5, result.first_row().column(0).as<Integer>().value());
+  
+  TEST_LOG("Successfully batch inserted 5 vectors");
+}
+
+/**
+ * Test prepared statements with vectors
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, PreparedStatementWithVector) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  session_.execute("CREATE TABLE IF NOT EXISTS prepared_vectors ("
+                   "id int PRIMARY KEY, "
+                   "data vector<double, 3>)");
+  
+  // Prepare the statement
+  Prepared prepared = session_.prepare("INSERT INTO prepared_vectors (id, data) VALUES (?, ?)");
+  
+  // Use the prepared statement multiple times
+  for (int i = 1; i <= 3; i++) {
+    Statement bound = prepared.bind();
+    bound.bind(0, i);
+    
+    CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_DOUBLE, 3);
+    cass_vector_append_double(vec, i * 1.1);
+    cass_vector_append_double(vec, i * 2.2);
+    cass_vector_append_double(vec, i * 3.3);
+    
+    cass_statement_bind_vector(bound.get(), 1, vec);
+    session_.execute(bound);
+    cass_vector_free(vec);
+  }
+  
+  // Verify all rows
+  Result result = session_.execute("SELECT COUNT(*) FROM prepared_vectors");
+  ASSERT_EQ(3, result.first_row().column(0).as<Integer>().value());
+  
+  TEST_LOG("Successfully used prepared statements with vectors");
+}
+
+/**
+ * Test null vector handling
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, NullVectorColumn) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  session_.execute("CREATE TABLE IF NOT EXISTS nullable_vectors ("
+                   "id int PRIMARY KEY, "
+                   "vec vector<float, 3>)");
+  
+  // Insert with null vector
+  session_.execute("INSERT INTO nullable_vectors (id, vec) VALUES (1, null)");
+  
+  // Insert with actual vector
+  Statement stmt("INSERT INTO nullable_vectors (id, vec) VALUES (?, ?)");
+  stmt.bind(0, 2);
+  
+  CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 3);
+  cass_vector_append_float(vec, 1.0f);
+  cass_vector_append_float(vec, 2.0f);
+  cass_vector_append_float(vec, 3.0f);
+  cass_statement_bind_vector(stmt.get(), 1, vec);
+  session_.execute(stmt);
+  cass_vector_free(vec);
+  
+  // Query and verify
+  Result result = session_.execute("SELECT * FROM nullable_vectors ORDER BY id");
+  ASSERT_EQ(2ul, result.row_count());
+  
+  // First row should have null vector
+  ASSERT_TRUE(result.rows()[0].column_by_name<Value>("vec").is_null());
+  
+  // Second row should have non-null vector
+  ASSERT_FALSE(result.rows()[1].column_by_name<Value>("vec").is_null());
+  
+  TEST_LOG("Successfully handled null and non-null vectors");
+}

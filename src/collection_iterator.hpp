@@ -75,6 +75,23 @@ private:
   DataType::Vec::const_iterator end_;
 };
 
+class VectorIterator : public ValueIterator {
+public:
+  VectorIterator(const Value* vector);
+
+  virtual bool next();
+
+private:
+  bool decode_value();
+  
+private:
+  const Value* vector_;
+  DataType::ConstPtr element_type_;
+  bool is_fixed_length_;
+  int32_t index_;
+  int32_t dimension_;
+};
+
 }}} // namespace datastax::internal::core
 
 #endif
