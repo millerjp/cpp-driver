@@ -1,0 +1,11 @@
+prefix=/usr/local
+exec_prefix=/usr/local
+libdir=/usr/local/lib/x86_64-linux-gnu
+includedir=/usr/local/include
+
+Name: cassandra
+Description: A C/C++ client driver for Apache Cassandra and DataStax Products
+Version: 2.17.1
+Libs: -L${libdir} -lcassandra
+Cflags: -I${includedir}
+URL: https://github.com/datastax/cpp-driver/
