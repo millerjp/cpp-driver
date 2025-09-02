@@ -111,3 +111,6 @@ log/
 # Build artifacts
 compile_commands.json
 embedded-ads.jar
+
+*.log
+venv/*
