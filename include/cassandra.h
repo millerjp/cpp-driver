@@ -8183,6 +8183,21 @@ CASS_EXPORT CassError
 cass_vector_append_user_type(CassVector* vector,
                             const CassUserType* value);
 
+/**
+ * Appends a vector to the vector (for nested vectors).
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @param[in] value
+ * @return CASS_OK if successful, otherwise an error occurred.
+ */
+CASS_EXPORT CassError
+cass_vector_append_vector(CassVector* vector,
+                         const CassVector* value);
+
 /***********************************************************************************
  *
  * Tuple

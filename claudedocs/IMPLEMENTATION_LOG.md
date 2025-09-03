@@ -54,7 +54,7 @@
 - [ ] Memory leak verification
 - [ ] Performance benchmarks
 - [ ] Missing C API functions (date/time/timestamp/varint not exposed)
-- [ ] cass_vector_append_vector() not in public header
+- [x] cass_vector_append_vector() - NOW ADDED to public header (Session 18)
 
 ### 🚨 CRITICAL GAPS
 1. **NO ANN SEARCH** - Vectors without similarity search are useless!
