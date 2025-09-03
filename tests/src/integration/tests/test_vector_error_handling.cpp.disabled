@@ -41,7 +41,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorErrorHandlingTest, IteratorFailsOnInvalidVect
   
   // Create a decoder with some dummy data
   const char dummy_data[] = {0x00, 0x00, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04};
-  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_4);
+  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_V4);
   
   // Create a value with the invalid type
   Value invalid_value(invalid_type, decoder);
@@ -65,7 +65,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorErrorHandlingTest, IteratorFailsOnUnparseable
   DataType::ConstPtr malformed_type(new CustomType("org.apache.cassandra.db.marshal.VectorType(malformed)"));
   
   const char dummy_data[] = {0x00, 0x00, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04};
-  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_4);
+  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_V4);
   
   Value malformed_value(malformed_type, decoder);
   VectorIterator iterator(&malformed_value);
@@ -86,7 +86,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorErrorHandlingTest, IteratorFailsOnNonCustomTy
   DataType::ConstPtr int_type(new DataType(CASS_VALUE_TYPE_INT));
   
   const char dummy_data[] = {0x00, 0x00, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04};
-  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_4);
+  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_V4);
   
   Value int_value(int_type, decoder);
   VectorIterator iterator(&int_value);
