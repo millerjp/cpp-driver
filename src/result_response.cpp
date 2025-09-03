@@ -22,6 +22,7 @@
 #include "result_metadata.hpp"
 #include "result_response.hpp"
 #include "serialization.hpp"
+#include "vector_type.hpp"
 
 using namespace datastax;
 using namespace datastax::internal;
@@ -138,8 +139,20 @@ private:
     DataType::ConstPtr type = cache_.by_class(class_name);
     if (type) return type;
 
-    // If no mapping exists, return an actual custom type.
-    return DataType::ConstPtr(new CustomType(class_name.to_string()));
+    // Check if it's a VectorType
+    String class_name_str = class_name.to_string();
+    if (class_name_str.find("org.apache.cassandra.db.marshal.VectorType") == 0) {
+      // Parse the vector type
+      VectorType::ConstPtr vector_type = VectorType::from_class_name(class_name_str);
+      if (vector_type) {
+        return vector_type;
+      }
+      // If parsing failed, log and fall through to custom type
+      LOG_WARN("Failed to parse vector type from class name: %s", class_name_str.c_str());
+    }
+
+    // If no mapping exists and it's not a vector, return an actual custom type.
+    return DataType::ConstPtr(new CustomType(class_name_str));
   }
 
   DataType::ConstPtr decode_collection(CassValueType collection_type) {
