@@ -88,6 +88,7 @@ private:
   const Value* vector_;
   DataType::ConstPtr element_type_;
   bool is_fixed_length_;
+  bool is_valid_;  // Indicates if the vector was properly initialized
   int32_t index_;
   int32_t dimension_;
 };

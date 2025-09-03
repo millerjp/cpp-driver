@@ -1,0 +1,98 @@
+/*
+  Copyright (c) DataStax, Inc.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+#include "integration.hpp"
+#include "value.hpp"
+#include "collection_iterator.hpp"
+
+using namespace datastax::internal::core;
+
+/**
+ * Test vector error handling and failure modes
+ */
+class VectorErrorHandlingTest : public Integration {
+public:
+  void SetUp() {
+    Integration::SetUp();
+  }
+};
+
+/**
+ * Test that VectorIterator fails properly with invalid data
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorErrorHandlingTest, IteratorFailsOnInvalidVector) {
+  CHECK_FAILURE;
+  
+  // Create a mock value with invalid custom type
+  DataType::ConstPtr invalid_type(new CustomType("invalid.class.name"));
+  
+  // Create a decoder with some dummy data
+  const char dummy_data[] = {0x00, 0x00, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04};
+  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_4);
+  
+  // Create a value with the invalid type
+  Value invalid_value(invalid_type, decoder);
+  
+  // Create VectorIterator - should be invalid
+  VectorIterator iterator(&invalid_value);
+  
+  // Verify iterator doesn't iterate
+  ASSERT_FALSE(iterator.next()) << "Iterator should not iterate on invalid vector type";
+  
+  TEST_LOG("VectorIterator properly fails on invalid vector type");
+}
+
+/**
+ * Test that VectorIterator fails when custom type can't be parsed
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorErrorHandlingTest, IteratorFailsOnUnparseableCustomType) {
+  CHECK_FAILURE;
+  
+  // Create a custom type that looks like a vector but is malformed
+  DataType::ConstPtr malformed_type(new CustomType("org.apache.cassandra.db.marshal.VectorType(malformed)"));
+  
+  const char dummy_data[] = {0x00, 0x00, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04};
+  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_4);
+  
+  Value malformed_value(malformed_type, decoder);
+  VectorIterator iterator(&malformed_value);
+  
+  // Should not iterate
+  ASSERT_FALSE(iterator.next()) << "Iterator should not iterate on unparseable vector type";
+  
+  TEST_LOG("VectorIterator properly fails on unparseable custom type");
+}
+
+/**
+ * Test that VectorIterator fails when given a non-custom type
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorErrorHandlingTest, IteratorFailsOnNonCustomType) {
+  CHECK_FAILURE;
+  
+  // Create a regular INT type (not custom)
+  DataType::ConstPtr int_type(new DataType(CASS_VALUE_TYPE_INT));
+  
+  const char dummy_data[] = {0x00, 0x00, 0x00, 0x04, 0x01, 0x02, 0x03, 0x04};
+  Decoder decoder(dummy_data, sizeof(dummy_data), CASS_PROTOCOL_VERSION_4);
+  
+  Value int_value(int_type, decoder);
+  VectorIterator iterator(&int_value);
+  
+  // Should not iterate
+  ASSERT_FALSE(iterator.next()) << "Iterator should not iterate on non-custom type";
+  
+  TEST_LOG("VectorIterator properly fails on non-custom type");
+}

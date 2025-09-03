@@ -55,6 +55,7 @@ VectorIterator::VectorIterator(const Value* vector)
     : ValueIterator(CASS_ITERATOR_TYPE_VECTOR, vector->decoder())
     , vector_(vector)
     , is_fixed_length_(true)
+    , is_valid_(false)  // Start as invalid until properly initialized
     , index_(-1)
     , dimension_(0) {
   // Get the vector type to extract element type and dimension
@@ -67,69 +68,27 @@ VectorIterator::VectorIterator(const Value* vector)
       element_type_ = vector_type->element_type();
       dimension_ = vector_type->dimension();
       is_fixed_length_ = vector_type->is_fixed_length_element();
+      is_valid_ = (element_type_ && dimension_ > 0);  // Mark as valid only if properly parsed
     } else {
-      // Failed to parse - for now, hardcode for testing
-      // Try to guess from the class name
-      String class_name = custom_type->class_name();
-      
-      // Check if it contains VectorType at all
-      if (class_name.find("VectorType") != String::npos) {
-        // Temporary hardcoding - parse basic types from class name
-        // TODO: Properly parse the class name format from server
-        if (class_name.find("FloatType") != String::npos) {
-          element_type_ = DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_FLOAT));
-          is_fixed_length_ = true;
-          
-          // Try to extract dimension from class name
-          // Format: "...VectorType(org.apache.cassandra.db.marshal.FloatType, N)"
-          size_t comma_pos = class_name.rfind(',');
-          size_t paren_pos = class_name.rfind(')');
-          if (comma_pos != String::npos && paren_pos != String::npos && comma_pos < paren_pos) {
-            String dim_str = class_name.substr(comma_pos + 1, paren_pos - comma_pos - 1);
-            // Trim whitespace
-            size_t start = dim_str.find_first_not_of(" \t");
-            if (start != String::npos) {
-              dimension_ = atoi(dim_str.substr(start).c_str());
-              if (dimension_ <= 0 || dimension_ > 8192) {
-                // Invalid dimension - fail
-                LOG_ERROR("Invalid vector dimension parsed: %d from '%s'", 
-                         dimension_, class_name.c_str());
-                element_type_.reset();
-                dimension_ = 0;
-              }
-            } else {
-              // Failed to parse dimension
-              LOG_ERROR("Failed to parse vector dimension from: '%s'", class_name.c_str());
-              element_type_.reset();
-              dimension_ = 0;
-            }
-          } else {
-            // Failed to find dimension in class name
-            LOG_ERROR("Failed to find vector dimension in class name: '%s'", class_name.c_str());
-            element_type_.reset();
-            dimension_ = 0;
-          }
-        } else {
-          // Unknown vector element type - fail
-          LOG_ERROR("Unknown vector element type in class name: '%s'", class_name.c_str());
-          element_type_.reset();
-          dimension_ = 0;
-          is_fixed_length_ = true;
-        }
-      } else {
-        // Fallback: treat as empty vector
-        dimension_ = 0;
-        is_fixed_length_ = true;
-      }
+      // Failed to parse vector type from class name
+      LOG_ERROR("Failed to parse vector type from class name: '%s'. VectorType::from_class_name() returned null.", 
+                custom_type->class_name().c_str());
+      // Leave is_valid_ as false to indicate error
+      return;
     }
   } else {
-    // Not a vector type, shouldn't happen but handle gracefully
-    dimension_ = 0;
-    is_fixed_length_ = true;
+    // Not a custom type or not a vector
+    LOG_ERROR("VectorIterator created for non-vector type (value_type=%d)", 
+              data_type ? data_type->value_type() : -1);
+    // Leave is_valid_ as false to indicate error
+    return;
   }
 }
 
 bool VectorIterator::next() {
+  if (!is_valid_) {
+    return false;  // Cannot iterate invalid vector
+  }
   if (index_ + 1 >= dimension_) {
     return false;
   }
@@ -138,7 +97,7 @@ bool VectorIterator::next() {
 }
 
 bool VectorIterator::decode_value() {
-  if (!element_type_) {
+  if (!is_valid_ || !element_type_) {
     return false;
   }
   
