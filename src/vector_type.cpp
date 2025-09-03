@@ -17,6 +17,7 @@
 #include "vector_type.hpp"
 #include "string.hpp"
 #include "logger.hpp"
+#include "data_type_parser.hpp"
 #include <cstdlib>
 
 namespace datastax { namespace internal { namespace core {
@@ -42,22 +43,29 @@ VectorType::ConstPtr VectorType::from_class_name(const String& class_name) {
   String params = class_name.substr(paren_start + 1, paren_end - paren_start - 1);
   
   // Find the comma separating element type and dimension
-  // Need to handle nested types like VectorType(ListType(Int32Type), 3)
+  // Need to handle nested types with parentheses and angle brackets
   int paren_depth = 0;
+  int angle_depth = 0;
   size_t comma_pos = String::npos;
   
-  for (size_t i = 0; i < params.length(); ++i) {
-    if (params[i] == '(') {
+  for (size_t i = params.length(); i > 0; --i) {
+    char c = params[i - 1];
+    if (c == ')') {
       paren_depth++;
-    } else if (params[i] == ')') {
+    } else if (c == '(') {
       paren_depth--;
-    } else if (params[i] == ',' && paren_depth == 0) {
-      comma_pos = i;
+    } else if (c == '>') {
+      angle_depth++;
+    } else if (c == '<') {
+      angle_depth--;
+    } else if (c == ',' && paren_depth == 0 && angle_depth == 0) {
+      comma_pos = i - 1;
       break;
     }
   }
   
   if (comma_pos == String::npos) {
+    LOG_ERROR("Failed to find dimension separator in vector params: '%s'", params.c_str());
     return VectorType::ConstPtr();
   }
   
@@ -65,10 +73,17 @@ VectorType::ConstPtr VectorType::from_class_name(const String& class_name) {
   String element_type_str = params.substr(0, comma_pos);
   String dimension_str = params.substr(comma_pos + 1);
   
-  // Trim whitespace from dimension string
-  size_t first = dimension_str.find_first_not_of(" \t");
+  // Trim whitespace from both strings
+  size_t first = element_type_str.find_first_not_of(" \t");
+  size_t last = element_type_str.find_last_not_of(" \t");
   if (first != String::npos) {
-    dimension_str = dimension_str.substr(first);
+    element_type_str = element_type_str.substr(first, last - first + 1);
+  }
+  
+  first = dimension_str.find_first_not_of(" \t");
+  last = dimension_str.find_last_not_of(" \t");
+  if (first != String::npos) {
+    dimension_str = dimension_str.substr(first, last - first + 1);
   }
   
   // Parse dimension as integer
@@ -76,34 +91,18 @@ VectorType::ConstPtr VectorType::from_class_name(const String& class_name) {
   long dimension = std::strtol(dimension_str.c_str(), &end_ptr, 10);
   
   if (*end_ptr != '\0' || dimension <= 0 || dimension > 8192) {
+    LOG_ERROR("Invalid vector dimension: '%s'", dimension_str.c_str());
     return VectorType::ConstPtr();
   }
   
-  // Parse element type - handle both simple and complex types
-  DataType::ConstPtr element_type;
+  // Parse element type using the existing recursive parser
+  SimpleDataTypeCache cache;
+  DataType::ConstPtr element_type = DataTypeClassNameParser::parse_one(element_type_str, cache);
   
-  // Check for collection types first
-  if (element_type_str.find("org.apache.cassandra.db.marshal.ListType") == 0) {
-    // For now, we can't fully parse nested collection types without more context
-    // Log the issue and fail explicitly
-    LOG_ERROR("Cannot parse nested collection type in vector: '%s' - not yet implemented", element_type_str.c_str());
+  if (!element_type) {
+    LOG_ERROR("Failed to parse vector element type: '%s'", element_type_str.c_str());
     return VectorType::ConstPtr();
-  } else if (element_type_str.find("org.apache.cassandra.db.marshal.SetType") == 0) {
-    LOG_ERROR("Cannot parse nested set type in vector: '%s' - not yet implemented", element_type_str.c_str());
-    return VectorType::ConstPtr();
-  } else if (element_type_str.find("org.apache.cassandra.db.marshal.MapType") == 0) {
-    LOG_ERROR("Cannot parse nested map type in vector: '%s' - not yet implemented", element_type_str.c_str());
-    return VectorType::ConstPtr();
-  } else {
-    // Try to parse as simple type
-    element_type = DataType::create_by_class(element_type_str);
-    if (!element_type) {
-      LOG_ERROR("Failed to create DataType from class: '%s' - unknown type", element_type_str.c_str());
-      return VectorType::ConstPtr();
-    }
   }
-  
-  LOG_ERROR("[DEBUG] Successfully created element type, value_type=%d", element_type->value_type());
   
   return VectorType::ConstPtr(new VectorType(element_type, static_cast<size_t>(dimension)));
 }
