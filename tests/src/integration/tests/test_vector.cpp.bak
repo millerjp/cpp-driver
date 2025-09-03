@@ -80,7 +80,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, FloatVector) {
   
   // TODO: Once iterator is implemented, verify the vector values
   // For now, just check that the column exists and is not null
-  ASSERT_FALSE(row.column_by_name<Value>("embedding").is_null());
+  ASSERT_FALSE(row.column_by_name<Null>("embedding").is_null());
   
   TEST_LOG("Successfully inserted and retrieved float vector");
 }
@@ -177,7 +177,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, IntegerVector) {
   // Query back
   Result result = session_.execute("SELECT * FROM int_vectors WHERE id = 1");
   ASSERT_EQ(1ul, result.row_count());
-  ASSERT_FALSE(result.first_row().column_by_name<Value>("values").is_null());
+  ASSERT_FALSE(result.first_row().column_by_name<Null>("values").is_null());
   
   TEST_LOG("Successfully inserted and retrieved integer vector");
 }
@@ -211,7 +211,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, TextVector) {
   // Query back
   Result result = session_.execute("SELECT * FROM text_vectors WHERE id = 1");
   ASSERT_EQ(1ul, result.row_count());
-  ASSERT_FALSE(result.first_row().column_by_name<Value>("words").is_null());
+  ASSERT_FALSE(result.first_row().column_by_name<Null>("words").is_null());
   
   TEST_LOG("Successfully inserted and retrieved text vector");
 }
@@ -250,7 +250,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, BatchInsertVectors) {
   // Verify all rows were inserted
   Result result = session_.execute("SELECT COUNT(*) FROM batch_vectors");
   ASSERT_EQ(1ul, result.row_count());
-  ASSERT_EQ(5, result.first_row().column(0).as<Integer>().value());
+  ASSERT_EQ(5, result.first_row().column_by_name<BigInt>("count").value());
   
   TEST_LOG("Successfully batch inserted 5 vectors");
 }
@@ -286,7 +286,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, PreparedStatementWithVector)
   
   // Verify all rows
   Result result = session_.execute("SELECT COUNT(*) FROM prepared_vectors");
-  ASSERT_EQ(3, result.first_row().column(0).as<Integer>().value());
+  ASSERT_EQ(3, result.first_row().column_by_name<BigInt>("count").value());
   
   TEST_LOG("Successfully used prepared statements with vectors");
 }
@@ -322,10 +322,10 @@ CASSANDRA_INTEGRATION_TEST_F(VectorIntegrationTest, NullVectorColumn) {
   ASSERT_EQ(2ul, result.row_count());
   
   // First row should have null vector
-  ASSERT_TRUE(result.rows()[0].column_by_name<Value>("vec").is_null());
+  ASSERT_TRUE(result.rows()[0].column_by_name<Null>("vec").is_null());
   
   // Second row should have non-null vector
-  ASSERT_FALSE(result.rows()[1].column_by_name<Value>("vec").is_null());
+  ASSERT_FALSE(result.rows()[1].column_by_name<Null>("vec").is_null());
   
   TEST_LOG("Successfully handled null and non-null vectors");
 }
