@@ -197,6 +197,73 @@ Value Range    | Encoding Pattern           | Bytes
 **Design Decisions Made:**
 1. Used portable `leading_zeros_64()` with compiler intrinsics when available
 2. Followed Go's exact bit patterns for multi-byte encoding
+
+---
+
+## Session 14: Variable-Length Vector Support & Critical Safety Fixes
+
+**Date**: 2024-09-03  
+**Status**: ✅ Partially Complete (Parsing improved, nested collections not yet supported)
+
+### Critical Safety Fixes
+
+**REMOVED DANGEROUS PATTERNS:**
+1. **Hardcoded FLOAT type** - REMOVED
+   - Previously defaulted to `CASS_VALUE_TYPE_FLOAT` when parsing failed
+   - Now fails explicitly with error logging
+   
+2. **Silent fallback to empty vector** - REMOVED
+   - Previously silently treated unparseable vectors as empty (dimension=0)
+   - Now fails explicitly and logs error
+
+3. **Added proper error state**
+   - Added `is_valid_` flag to VectorIterator
+   - Iterator methods check validity before operating
+   - Prevents iteration on malformed vectors
+
+**Files Modified:**
+1. `/src/collection_iterator.hpp` - Added `is_valid_` member
+2. `/src/collection_iterator.cpp` - Removed hardcoded defaults, added validation
+3. `/src/vector_type.cpp` - Improved parsing with explicit error handling
+
+### Variable-Length Type Support
+
+**Improvements Made:**
+1. **VectorType parsing enhanced** for simple types:
+   - Text vectors (UTF8Type) now parse correctly
+   - Blob vectors (BytesType) now parse correctly
+   - All fixed-length types (int, float, UUID) parse correctly
+   
+2. **Explicit failure for unsupported types**:
+   - Nested collections (ListType, SetType, MapType in vectors) fail with clear error
+   - Unknown types fail with error logging
+   - No silent defaults or corrupted data
+
+**Files Created:**
+1. `/tests/src/integration/tests/test_vector_error_handling.cpp` - Error handling tests
+2. `/tests/src/integration/tests/test_vector_text_blob.cpp` - Variable-length type tests
+3. `/verify_fixes.sh` - Verification script for safety fixes
+
+### Current Limitations
+
+**Not Yet Implemented:**
+1. **Nested collection support** - `vector<frozen<list<int>>>` not yet supported
+   - Requires recursive type parsing
+   - Explicitly fails with error message
+
+2. **Full integration testing** - Requires Cassandra 5.0 server
+   - Unit tests pass
+   - Parsing logic verified
+   - Round-trip tests written but not executed
+
+### Key Design Principle
+
+**FAIL FAST, FAIL EXPLICITLY**
+- No hardcoded defaults
+- No silent failures  
+- No type assumptions
+- Every parsing failure is logged
+- Data integrity over convenience
 3. Added comprehensive error handling in decode function
 4. Created extensive test coverage including all Go test vectors
 

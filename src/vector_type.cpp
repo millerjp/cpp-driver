@@ -16,6 +16,7 @@
 
 #include "vector_type.hpp"
 #include "string.hpp"
+#include "logger.hpp"
 #include <cstdlib>
 
 namespace datastax { namespace internal { namespace core {
@@ -25,6 +26,7 @@ const char* VectorType::VECTOR_CLASS_NAME = "org.apache.cassandra.db.marshal.Vec
 VectorType::ConstPtr VectorType::from_class_name(const String& class_name) {
   // Check if it starts with the vector class name
   if (class_name.find(VECTOR_CLASS_NAME) != 0) {
+    // Not a vector type - this is expected for non-vector types
     return VectorType::ConstPtr();
   }
   
@@ -77,11 +79,31 @@ VectorType::ConstPtr VectorType::from_class_name(const String& class_name) {
     return VectorType::ConstPtr();
   }
   
-  // Parse element type (this would need integration with DataType::create_by_class)
-  DataType::ConstPtr element_type = DataType::create_by_class(element_type_str);
-  if (!element_type) {
+  // Parse element type - handle both simple and complex types
+  DataType::ConstPtr element_type;
+  
+  // Check for collection types first
+  if (element_type_str.find("org.apache.cassandra.db.marshal.ListType") == 0) {
+    // For now, we can't fully parse nested collection types without more context
+    // Log the issue and fail explicitly
+    LOG_ERROR("Cannot parse nested collection type in vector: '%s' - not yet implemented", element_type_str.c_str());
     return VectorType::ConstPtr();
+  } else if (element_type_str.find("org.apache.cassandra.db.marshal.SetType") == 0) {
+    LOG_ERROR("Cannot parse nested set type in vector: '%s' - not yet implemented", element_type_str.c_str());
+    return VectorType::ConstPtr();
+  } else if (element_type_str.find("org.apache.cassandra.db.marshal.MapType") == 0) {
+    LOG_ERROR("Cannot parse nested map type in vector: '%s' - not yet implemented", element_type_str.c_str());
+    return VectorType::ConstPtr();
+  } else {
+    // Try to parse as simple type
+    element_type = DataType::create_by_class(element_type_str);
+    if (!element_type) {
+      LOG_ERROR("Failed to create DataType from class: '%s' - unknown type", element_type_str.c_str());
+      return VectorType::ConstPtr();
+    }
   }
+  
+  LOG_ERROR("[DEBUG] Successfully created element type, value_type=%d", element_type->value_type());
   
   return VectorType::ConstPtr(new VectorType(element_type, static_cast<size_t>(dimension)));
 }
