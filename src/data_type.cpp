@@ -23,6 +23,7 @@
 #include "types.hpp"
 #include "user_type_value.hpp"
 #include "utils.hpp"
+#include "vector_type.hpp"
 
 #include <string.h>
 
@@ -418,9 +419,29 @@ bool IsValidDataType<const CassandraVector*>::operator()(const CassandraVector* 
   // Vectors can be bound to CUSTOM types (this is how Cassandra represents them in prepared statements)
   if (data_type->value_type() == CASS_VALUE_TYPE_CUSTOM) {
     const CustomType* custom_type = static_cast<const CustomType*>(data_type.get());
-    // Accept any custom type that contains "VectorType" in its class name
-    // The server validates the actual type compatibility
-    return custom_type->class_name().find("VectorType") != StringRef::npos;
+    
+    // Parse the VectorType to validate element type and dimension
+    VectorType::ConstPtr expected_vector = VectorType::from_class_name(custom_type->class_name());
+    if (expected_vector) {
+      // Check that both element type and dimension match exactly
+      if (value->dimension() != expected_vector->dimension()) {
+        return false; // Dimension mismatch
+      }
+      
+      // Get the actual element type from the vector
+      DataType::ConstPtr actual_element_type = value->element_type();
+      DataType::ConstPtr expected_element_type = expected_vector->element_type();
+      
+      // Compare element types - they must match exactly
+      if (!actual_element_type || !expected_element_type) {
+        return false;
+      }
+      
+      return actual_element_type->equals(expected_element_type);
+    }
+    
+    // If it's not a valid vector type, reject it
+    return false;
   }
   return value->data_type()->equals(data_type);
 }
