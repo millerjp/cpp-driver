@@ -74,11 +74,48 @@ VectorIterator::VectorIterator(const Value* vector)
       
       // Check if it contains VectorType at all
       if (class_name.find("VectorType") != String::npos) {
-        // Hardcode for float,3 for testing
+        // Temporary hardcoding - parse basic types from class name
         // TODO: Properly parse the class name format from server
-        element_type_ = DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_FLOAT));
-        dimension_ = 3;
-        is_fixed_length_ = true;
+        if (class_name.find("FloatType") != String::npos) {
+          element_type_ = DataType::ConstPtr(new DataType(CASS_VALUE_TYPE_FLOAT));
+          is_fixed_length_ = true;
+          
+          // Try to extract dimension from class name
+          // Format: "...VectorType(org.apache.cassandra.db.marshal.FloatType, N)"
+          size_t comma_pos = class_name.rfind(',');
+          size_t paren_pos = class_name.rfind(')');
+          if (comma_pos != String::npos && paren_pos != String::npos && comma_pos < paren_pos) {
+            String dim_str = class_name.substr(comma_pos + 1, paren_pos - comma_pos - 1);
+            // Trim whitespace
+            size_t start = dim_str.find_first_not_of(" \t");
+            if (start != String::npos) {
+              dimension_ = atoi(dim_str.substr(start).c_str());
+              if (dimension_ <= 0 || dimension_ > 8192) {
+                // Invalid dimension - fail
+                LOG_ERROR("Invalid vector dimension parsed: %d from '%s'", 
+                         dimension_, class_name.c_str());
+                element_type_.reset();
+                dimension_ = 0;
+              }
+            } else {
+              // Failed to parse dimension
+              LOG_ERROR("Failed to parse vector dimension from: '%s'", class_name.c_str());
+              element_type_.reset();
+              dimension_ = 0;
+            }
+          } else {
+            // Failed to find dimension in class name
+            LOG_ERROR("Failed to find vector dimension in class name: '%s'", class_name.c_str());
+            element_type_.reset();
+            dimension_ = 0;
+          }
+        } else {
+          // Unknown vector element type - fail
+          LOG_ERROR("Unknown vector element type in class name: '%s'", class_name.c_str());
+          element_type_.reset();
+          dimension_ = 0;
+          is_fixed_length_ = true;
+        }
       } else {
         // Fallback: treat as empty vector
         dimension_ = 0;
