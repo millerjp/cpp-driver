@@ -125,7 +125,8 @@ const CassValue* cass_iterator_get_column(const CassIterator* iterator) {
 
 const CassValue* cass_iterator_get_value(const CassIterator* iterator) {
   if (iterator->type() != CASS_ITERATOR_TYPE_COLLECTION &&
-      iterator->type() != CASS_ITERATOR_TYPE_TUPLE) {
+      iterator->type() != CASS_ITERATOR_TYPE_TUPLE &&
+      iterator->type() != CASS_ITERATOR_TYPE_VECTOR) {
     return NULL;
   }
   return CassValue::to(static_cast<const ValueIterator*>(iterator->from())->value());

@@ -559,6 +559,7 @@ public:
   bool decode_warnings(WarningVec& output);
 
   Value decode_value(const DataType::ConstPtr& data_type);
+  Value decode_vector_element(const DataType::ConstPtr& element_type, bool is_fixed_length);
   bool update_value(Value& value);
 
   bool is_null() const { return input_ == NULL; }

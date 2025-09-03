@@ -17,6 +17,7 @@
 #include "decoder.hpp"
 #include "logger.hpp"
 #include "value.hpp"
+#include "uvint.hpp"
 
 #define CHECK_REMAINING(SIZE, DETAIL)             \
   do {                                            \
@@ -156,6 +157,73 @@ Value Decoder::decode_value(const DataType::ConstPtr& data_type) {
     return Value();
   }
   return Value(data_type);
+}
+
+Value Decoder::decode_vector_element(const DataType::ConstPtr& element_type, bool is_fixed_length) {
+  if (is_fixed_length) {
+    // Fixed-length types have no size prefix in vectors
+    // Determine the size based on the type
+    size_t element_size = 0;
+    switch (element_type->value_type()) {
+      case CASS_VALUE_TYPE_BOOLEAN:
+        element_size = 1;
+        break;
+      case CASS_VALUE_TYPE_INT:
+      case CASS_VALUE_TYPE_FLOAT:
+        element_size = 4;
+        break;
+      case CASS_VALUE_TYPE_BIGINT:
+      case CASS_VALUE_TYPE_TIMESTAMP:
+      case CASS_VALUE_TYPE_DOUBLE:
+        element_size = 8;
+        break;
+      case CASS_VALUE_TYPE_UUID:
+      case CASS_VALUE_TYPE_TIMEUUID:
+        element_size = 16;
+        break;
+      default:
+        // Unknown fixed-length type
+        return Value();
+    }
+    
+    if (remaining_ < element_size) {
+      return Value(); // Not enough data
+    }
+    
+    Decoder element_decoder(input_, element_size, protocol_version_);
+    input_ += element_size;
+    remaining_ -= element_size;
+    return Value(element_type, element_decoder);
+  } else {
+    // Variable-length types have UVINT size prefix in vectors
+    uint64_t size = 0;
+    size_t uvint_bytes = decode_uvint(reinterpret_cast<const uint8_t*>(input_), 
+                                     remaining_, &size);
+    if (uvint_bytes == 0 || uvint_bytes > remaining_) {
+      return Value(); // Failed to decode UVINT
+    }
+    
+    size_t element_size = static_cast<size_t>(size);
+    if (uvint_bytes + element_size > remaining_) {
+      return Value(); // Not enough data
+    }
+    
+    // Skip UVINT prefix and create decoder for element data
+    Decoder element_decoder(input_ + uvint_bytes, element_size, protocol_version_);
+    input_ += uvint_bytes + element_size;
+    remaining_ -= uvint_bytes + element_size;
+    
+    // For collections and other complex types, they have their own internal structure
+    if (element_type->is_collection()) {
+      int32_t count = 0;
+      if (element_decoder.decode_int32(count)) {
+        return Value(element_type, count, element_decoder);
+      }
+      return Value();
+    } else {
+      return Value(element_type, element_decoder);
+    }
+  }
 }
 
 bool Decoder::update_value(Value& value) {

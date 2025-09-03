@@ -38,7 +38,7 @@ public:
 };
 
 /**
- * Test basic float vector insert and select
+ * Test basic float vector insert and select with round-trip verification
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, SimpleFloatVector) {
   CHECK_FAILURE;
@@ -80,11 +80,35 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, SimpleFloatVector) {
   Row row = result.first_row();
   ASSERT_EQ(1, row.column_by_name<Integer>("id").value());
   
-  // Just verify the column exists (iterator not fully working yet)
-  // The column should exist and not be null
-  // Note: Can't easily check value without working iterator
+  // Get the vector value and iterate through elements
+  const CassValue* vec_value = cass_row_get_column_by_name(row.get(), "embedding");
+  ASSERT_NE(vec_value, nullptr);
   
-  TEST_LOG("Successfully inserted and retrieved float vector!");
+  // Debug: Check if the value is null
+  if (cass_value_is_null(vec_value)) {
+    TEST_LOG("WARNING: Vector value is NULL");
+  }
+  
+  CassIterator* iter = cass_iterator_from_vector(vec_value);
+  ASSERT_NE(iter, nullptr) << "Failed to create iterator from vector value";
+  
+  // Read and verify the vector elements
+  std::vector<float> values;
+  while (cass_iterator_next(iter)) {
+    const CassValue* element = cass_iterator_get_value(iter);
+    float val;
+    ASSERT_EQ(cass_value_get_float(element, &val), CASS_OK);
+    values.push_back(val);
+  }
+  cass_iterator_free(iter);
+  
+  // Verify we got the right values back
+  ASSERT_EQ(values.size(), 3ul);
+  ASSERT_FLOAT_EQ(values[0], 1.0f);
+  ASSERT_FLOAT_EQ(values[1], 2.0f);
+  ASSERT_FLOAT_EQ(values[2], 3.0f);
+  
+  TEST_LOG("Successfully completed float vector round-trip test!");
 }
 
 /**
@@ -156,4 +180,65 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, IntegerVector) {
   ASSERT_EQ(1ul, result.row_count());
   
   TEST_LOG("Successfully inserted integer vector!");
+}
+
+/**
+ * Test text vector with round-trip (variable-length elements with UVINT)
+ */
+CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, TextVectorRoundTrip) {
+  CHECK_FAILURE;
+  CHECK_VERSION(5.0.0);
+  
+  // Create table with text vector
+  session_.execute("CREATE TABLE IF NOT EXISTS text_vectors ("
+                   "id int PRIMARY KEY, "
+                   "tags vector<text, 3>)");
+  
+  // Create vector
+  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_TEXT, 3);
+  ASSERT_NE(vector, nullptr);
+  
+  // Add text values
+  ASSERT_EQ(cass_vector_append_string(vector, "hello"), CASS_OK);
+  ASSERT_EQ(cass_vector_append_string(vector, "world"), CASS_OK);
+  ASSERT_EQ(cass_vector_append_string(vector, "test"), CASS_OK);
+  
+  // Insert using prepared statement
+  Prepared prepared = session_.prepare("INSERT INTO text_vectors (id, tags) VALUES (?, ?)");
+  Statement stmt = prepared.bind();
+  stmt.bind<Integer>(0, Integer(1));
+  
+  CassStatement* raw_stmt = stmt.get();
+  ASSERT_EQ(cass_statement_bind_vector(raw_stmt, 1, vector), CASS_OK);
+  
+  session_.execute(stmt);
+  cass_vector_free(vector);
+  
+  // Query back and verify
+  Result result = session_.execute("SELECT tags FROM text_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
+  
+  Row row = result.first_row();
+  const CassValue* vec_value = cass_row_get_column(row.get(), 0);
+  ASSERT_NE(vec_value, nullptr);
+  
+  CassIterator* iter = cass_iterator_from_vector(vec_value);
+  ASSERT_NE(iter, nullptr);
+  
+  std::vector<std::string> values;
+  while (cass_iterator_next(iter)) {
+    const CassValue* element = cass_iterator_get_value(iter);
+    const char* str;
+    size_t str_len;
+    ASSERT_EQ(cass_value_get_string(element, &str, &str_len), CASS_OK);
+    values.push_back(std::string(str, str_len));
+  }
+  cass_iterator_free(iter);
+  
+  ASSERT_EQ(values.size(), 3ul);
+  ASSERT_EQ(values[0], "hello");
+  ASSERT_EQ(values[1], "world");
+  ASSERT_EQ(values[2], "test");
+  
+  TEST_LOG("Successfully completed text vector round-trip test with UVINT encoding!");
 }
