@@ -167,10 +167,23 @@ private:
       return CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS;
     }
     
-    // Type checking would go here - simplified for now
-    IsValidDataType<T> is_valid_type;
-    if (vector_type_->element_type() && !is_valid_type(value, vector_type_->element_type())) {
-      return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+    // Special case: Skip type checking for "unknown" element types
+    // This happens when Cassandra doesn't send complete type info for complex types
+    if (vector_type_->element_type()) {
+      // Check if element type is CUSTOM with class name "unknown"
+      if (vector_type_->element_type()->is_custom()) {
+        const CustomType* custom = static_cast<const CustomType*>(vector_type_->element_type().get());
+        if (custom && custom->class_name() == "unknown") {
+          // Skip type validation for unknown types - rely on server validation
+          return CASS_OK;
+        }
+      }
+      
+      // Normal type checking for known types
+      IsValidDataType<T> is_valid_type;
+      if (!is_valid_type(value, vector_type_->element_type())) {
+        return CASS_ERROR_LIB_INVALID_VALUE_TYPE;
+      }
     }
     
     return CASS_OK;

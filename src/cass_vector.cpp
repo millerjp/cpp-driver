@@ -63,6 +63,10 @@ const CassDataType* cass_vector_data_type(const CassVector* vector) {
   return CassDataType::to(vector->data_type().get());
 }
 
+const CassDataType* cass_vector_element_data_type(const CassVector* vector) {
+  return CassDataType::to(vector->element_type().get());
+}
+
 size_t cass_vector_dimension(const CassVector* vector) {
   return vector->dimension();
 }

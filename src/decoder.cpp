@@ -220,6 +220,20 @@ Value Decoder::decode_vector_element(const DataType::ConstPtr& element_type, boo
         return Value(element_type, count, element_decoder);
       }
       return Value();
+    } else if (element_type->is_custom()) {
+      // Special handling for "unknown" types - they might be collections
+      const CustomType* custom = static_cast<const CustomType*>(element_type.get());
+      if (custom && custom->class_name() == "unknown") {
+        // For "unknown" types, we need to peek at the data to see if it's a collection
+        // Collections start with an int32 count
+        int32_t count = 0;
+        Decoder test_decoder(element_decoder);
+        if (test_decoder.decode_int32(count) && count >= 0 && count < 1000000) {
+          // Looks like a collection - treat it as one
+          return Value(element_type, count, element_decoder);
+        }
+      }
+      return Value(element_type, element_decoder);
     } else {
       return Value(element_type, element_decoder);
     }

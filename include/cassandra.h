@@ -7867,6 +7867,20 @@ CASS_EXPORT const CassDataType*
 cass_vector_data_type(const CassVector* vector);
 
 /**
+ * Gets the element data type of a vector.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @return Returns a reference to the element data type of the vector. Do not free
+ * this reference as it is bound to the lifetime of the vector.
+ */
+CASS_EXPORT const CassDataType*
+cass_vector_element_data_type(const CassVector* vector);
+
+/**
  * Gets the dimension of a vector.
  *
  * @cassandra{5.0+}
