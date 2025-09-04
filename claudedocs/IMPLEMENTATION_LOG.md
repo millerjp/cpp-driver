@@ -72,14 +72,20 @@
   - Both drivers use Protocol v4, so not a protocol version issue
   - Root cause needs further investigation
 
-### ⚠️ CRITICAL ISSUE - Type Metadata Discrepancy
+### ⚠️ CRITICAL ISSUE - Type Metadata Discrepancy [ROOT CAUSE FOUND]
 - **Problem**: C++ driver gets "unknown" while Go driver gets full type information
+- **Root Cause**: C++ driver lacks recursive parsing for nested custom types in vectors
+  - When server sends `VectorType(ListType(Int32Type), 2)` as custom type metadata
+  - Go driver: Recursively parses via `typeInfoFromJavaString` → creates proper nested types
+  - C++ driver: Creates CustomType("unknown") when element type parsing fails
 - **Impact**: C++ vector iterator cannot read complex element types
 - **Workaround**: Option 5 allows writes to work, server validates data
-- **Next Steps**: 
-  1. Test Go driver with both protocol v4 and v5 to rule out protocol issues
-  2. Analyze how Go driver requests/parses metadata differently
-  3. Determine if this is a C++ driver bug or server behavior difference
+- **Proper Fix Would Require**:
+  1. Modify `DataTypeClassNameParser` to handle VectorType specially
+  2. Add recursive parsing for vector element types
+  3. Handle nested collections within vectors
+  4. Significant refactoring of metadata parsing system
+- **Recommendation**: Keep Option 5 as production solution until proper fix can be implemented
 
 ### ⚠️ PARTIALLY COMPLETE
 - [?] Named parameter binding - Works but needs comprehensive testing
@@ -342,6 +348,30 @@ Value Range    | Encoding Pattern           | Bytes
    - `include/cassandra.h` - Public API additions
 
 ## Session Log
+
+### Session 20 - Root Cause Analysis
+**Date**: Current Session
+**Focus**: Investigating type metadata discrepancy
+
+**Investigation Process**:
+1. Confirmed Go driver gets full type info with both protocol v4 and v5
+2. Traced C++ driver metadata reception - server sends "unknown" in class name
+3. Analyzed Go driver parsing - has `typeInfoFromJavaString` for recursive parsing
+4. Found C++ driver creates CustomType("unknown") when can't parse element type
+
+**Root Cause Identified**:
+- Server sends: `org.apache.cassandra.db.marshal.VectorType(ListType(Int32Type), 2)`
+- Go driver: Parses recursively, creates proper VectorType → CollectionType → IntType
+- C++ driver: VectorType parser calls `DataTypeClassNameParser::parse_one("ListType(Int32Type)")`
+- Parser doesn't recognize "ListType" (expects full class name), returns CustomType("unknown")
+
+**Decision**: Keep Option 5 as the production solution. Proper fix would require significant refactoring of the metadata parsing system, which is risky for a production driver. Option 5 provides a working solution with server-side validation.
+
+**Files Analyzed**:
+- `src/data_type_parser.cpp` - Main parser, lacks VectorType special handling
+- `src/vector_type.cpp` - Calls parser for element type, gets "unknown" back
+- `src/result_response.cpp` - Where metadata is initially processed
+- Go driver: `types.go`, `frame.go` - Has recursive custom type parsing
 
 ### Session 1: Initial Setup and Analysis (2025-09-02)
 - ✅ Created IMPLEMENTATION_LOG.md structure
