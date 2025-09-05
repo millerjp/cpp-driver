@@ -167,15 +167,14 @@ private:
       return CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS;
     }
     
-    // Special case: Skip type checking for "unknown" element types
-    // This happens when Cassandra doesn't send complete type info for complex types
     if (vector_type_->element_type()) {
       // Check if element type is CUSTOM with class name "unknown"
+      // This should not happen after metadata fix, treat as error
       if (vector_type_->element_type()->is_custom()) {
         const CustomType* custom = static_cast<const CustomType*>(vector_type_->element_type().get());
         if (custom && custom->class_name() == "unknown") {
-          // Skip type validation for unknown types - rely on server validation
-          return CASS_OK;
+          // Unknown element types indicate incomplete metadata - this is an error
+          return CASS_ERROR_LIB_INVALID_CUSTOM_TYPE;
         }
       }
       
