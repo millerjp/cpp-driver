@@ -72,20 +72,21 @@
   - Both drivers use Protocol v4, so not a protocol version issue
   - Root cause needs further investigation
 
-### ⚠️ CRITICAL ISSUE - Type Metadata Discrepancy [ROOT CAUSE FOUND]
+### ✅ FIXED - Type Metadata Discrepancy [Session 21]
 - **Problem**: C++ driver gets "unknown" while Go driver gets full type information
-- **Root Cause**: C++ driver lacks recursive parsing for nested custom types in vectors
-  - When server sends `VectorType(ListType(Int32Type), 2)` as custom type metadata
-  - Go driver: Recursively parses via `typeInfoFromJavaString` → creates proper nested types
-  - C++ driver: Creates CustomType("unknown") when element type parsing fails
-- **Impact**: C++ vector iterator cannot read complex element types
-- **Workaround**: Option 5 allows writes to work, server validates data
-- **Proper Fix Would Require**:
-  1. Modify `DataTypeClassNameParser` to handle VectorType specially
-  2. Add recursive parsing for vector element types
-  3. Handle nested collections within vectors
-  4. Significant refactoring of metadata parsing system
-- **Recommendation**: Keep Option 5 as production solution until proper fix can be implemented
+- **Root Cause Found**: VectorType constructor was calling `update_class_name()` which couldn't handle collection types
+  - Server sends: `VectorType(ListType(Int32Type), 2)` 
+  - C++ driver successfully parses the element type (ListType with Int32Type)
+  - But then `update_class_name()` overwrites with "unknown" for unhandled types
+- **Fix Applied**: Preserve the original class name from server instead of reconstructing
+  ```cpp
+  // In vector_type.cpp line 112-115
+  VectorType* vector = new VectorType(element_type, static_cast<size_t>(dimension));
+  vector->set_class_name(class_name);  // Preserve server's class name
+  return VectorType::ConstPtr(vector);
+  ```
+- **Impact**: Complex vectors now show full metadata correctly
+- **Status**: RESOLVED - Both drivers now handle complex vector metadata correctly
 
 ### ⚠️ PARTIALLY COMPLETE
 - [?] Named parameter binding - Works but needs comprehensive testing
@@ -350,7 +351,7 @@ Value Range    | Encoding Pattern           | Bytes
 ## Session Log
 
 ### Session 20 - Root Cause Analysis
-**Date**: Current Session
+**Date**: Previous Session
 **Focus**: Investigating type metadata discrepancy
 
 **Investigation Process**:
@@ -372,6 +373,51 @@ Value Range    | Encoding Pattern           | Bytes
 - `src/vector_type.cpp` - Calls parser for element type, gets "unknown" back
 - `src/result_response.cpp` - Where metadata is initially processed
 - Go driver: `types.go`, `frame.go` - Has recursive custom type parsing
+
+### Session 21 - Metadata Parsing Fix
+**Date**: Current Session  
+**Focus**: Fixing the complex vector metadata parsing issue
+
+**Deep Investigation**:
+1. Added extensive debug logging throughout parsing chain
+2. **Critical Discovery**: C++ driver DOES receive full metadata from server!
+   - Received: `VectorType(ListType(Int32Type), 2)` 
+   - NOT "unknown" from server
+3. Traced parsing flow:
+   - `decode_custom()` receives correct class name
+   - `VectorType::from_class_name()` parses it correctly
+   - `DataTypeClassNameParser::parse_one()` successfully creates ListType
+   - But then `update_class_name()` overwrites with "unknown"!
+
+**Root Cause**:
+- `VectorType` constructor calls `update_class_name()` 
+- `update_class_name()` tries to reconstruct the class name from element type
+- It doesn't handle LIST/SET/MAP types, defaults to "unknown"
+- This overwrites the correct class name received from server
+
+**Fix Applied**:
+```cpp
+// vector_type.cpp line 112-115
+VectorType* vector = new VectorType(element_type, static_cast<size_t>(dimension));
+// Preserve the original class name we received from the server
+vector->set_class_name(class_name);
+return VectorType::ConstPtr(vector);
+```
+
+**Testing**:
+- ✅ `vector<int, 3>` - Shows correct metadata
+- ✅ `vector<list<int>, 2>` - Now shows `VectorType(ListType(Int32Type), 2)` 
+- ✅ `vector<set<text>, 2>` - Now shows `VectorType(SetType(UTF8Type), 2)`
+- ✅ `vector<map<int,text>, 2>` - Now shows full metadata
+
+**Impact**:
+- Complex vectors now have complete metadata
+- Type validation can work properly
+- Iterator can determine element types correctly
+- Option 5 workaround may no longer be needed
+
+**Files Modified**:
+- `src/vector_type.cpp` - Preserve original class name instead of reconstructing
 
 ### Session 1: Initial Setup and Analysis (2025-09-02)
 - ✅ Created IMPLEMENTATION_LOG.md structure

@@ -136,11 +136,13 @@ private:
     StringRef class_name;
     if (!decoder_.decode_string(&class_name)) return DataType::NIL;
 
+    String class_name_str = class_name.to_string();
+    
+
     DataType::ConstPtr type = cache_.by_class(class_name);
     if (type) return type;
 
     // Check if it's a VectorType
-    String class_name_str = class_name.to_string();
     if (class_name_str.find("org.apache.cassandra.db.marshal.VectorType") == 0) {
       // Parse the vector type
       VectorType::ConstPtr vector_type = VectorType::from_class_name(class_name_str);

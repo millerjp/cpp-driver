@@ -101,10 +101,14 @@ VectorType::ConstPtr VectorType::from_class_name(const String& class_name) {
   
   if (!element_type) {
     LOG_ERROR("Failed to parse vector element type: '%s'", element_type_str.c_str());
-    return VectorType::ConstPtr();
+    // Fall back to creating a custom type with "unknown"
+    element_type = DataType::ConstPtr(new CustomType("unknown"));
   }
   
-  return VectorType::ConstPtr(new VectorType(element_type, static_cast<size_t>(dimension)));
+  VectorType* vector = new VectorType(element_type, static_cast<size_t>(dimension));
+  // Preserve the original class name we received from the server
+  vector->set_class_name(class_name);
+  return VectorType::ConstPtr(vector);
 }
 
 bool VectorType::is_fixed_length_element() const {
@@ -214,6 +218,99 @@ void VectorType::update_class_name() {
         break;
       case CASS_VALUE_TYPE_BLOB:
         ss << "org.apache.cassandra.db.marshal.BytesType";
+        break;
+      case CASS_VALUE_TYPE_LIST:
+        // For LIST types, need to include the element type
+        {
+          const CollectionType* collection = static_cast<const CollectionType*>(element_type_.get());
+          if (collection && !collection->types().empty()) {
+            ss << "org.apache.cassandra.db.marshal.ListType(";
+            // Recursively get the class name for the element type
+            DataType::ConstPtr elem = collection->types()[0];
+            // For now, handle simple types
+            switch (elem->value_type()) {
+              case CASS_VALUE_TYPE_INT:
+                ss << "org.apache.cassandra.db.marshal.Int32Type";
+                break;
+              case CASS_VALUE_TYPE_TEXT:
+              case CASS_VALUE_TYPE_VARCHAR:
+                ss << "org.apache.cassandra.db.marshal.UTF8Type";
+                break;
+              default:
+                ss << "unknown";
+                break;
+            }
+            ss << ")";
+          } else {
+            ss << "unknown";
+          }
+        }
+        break;
+      case CASS_VALUE_TYPE_SET:
+        // For SET types, need to include the element type
+        {
+          const CollectionType* collection = static_cast<const CollectionType*>(element_type_.get());
+          if (collection && !collection->types().empty()) {
+            ss << "org.apache.cassandra.db.marshal.SetType(";
+            DataType::ConstPtr elem = collection->types()[0];
+            switch (elem->value_type()) {
+              case CASS_VALUE_TYPE_INT:
+                ss << "org.apache.cassandra.db.marshal.Int32Type";
+                break;
+              case CASS_VALUE_TYPE_TEXT:
+              case CASS_VALUE_TYPE_VARCHAR:
+                ss << "org.apache.cassandra.db.marshal.UTF8Type";
+                break;
+              default:
+                ss << "unknown";
+                break;
+            }
+            ss << ")";
+          } else {
+            ss << "unknown";
+          }
+        }
+        break;
+      case CASS_VALUE_TYPE_MAP:
+        // For MAP types, need to include key and value types
+        {
+          const CollectionType* collection = static_cast<const CollectionType*>(element_type_.get());
+          if (collection && collection->types().size() >= 2) {
+            ss << "org.apache.cassandra.db.marshal.MapType(";
+            DataType::ConstPtr key = collection->types()[0];
+            DataType::ConstPtr val = collection->types()[1];
+            // Handle key type
+            switch (key->value_type()) {
+              case CASS_VALUE_TYPE_INT:
+                ss << "org.apache.cassandra.db.marshal.Int32Type";
+                break;
+              case CASS_VALUE_TYPE_TEXT:
+              case CASS_VALUE_TYPE_VARCHAR:
+                ss << "org.apache.cassandra.db.marshal.UTF8Type";
+                break;
+              default:
+                ss << "unknown";
+                break;
+            }
+            ss << ",";
+            // Handle value type
+            switch (val->value_type()) {
+              case CASS_VALUE_TYPE_INT:
+                ss << "org.apache.cassandra.db.marshal.Int32Type";
+                break;
+              case CASS_VALUE_TYPE_TEXT:
+              case CASS_VALUE_TYPE_VARCHAR:
+                ss << "org.apache.cassandra.db.marshal.UTF8Type";
+                break;
+              default:
+                ss << "unknown";
+                break;
+            }
+            ss << ")";
+          } else {
+            ss << "unknown";
+          }
+        }
         break;
       case CASS_VALUE_TYPE_CUSTOM:
         // For custom types (like nested vectors), use their class name
