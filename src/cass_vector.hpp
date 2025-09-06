@@ -111,6 +111,10 @@ public:
   APPEND_TYPE(CassInet)
   APPEND_TYPE(CassDecimal)
   APPEND_TYPE(CassDuration)
+  APPEND_TYPE(CassDate)
+  APPEND_TYPE(CassTime)
+  APPEND_TYPE(CassTimestamp)
+  APPEND_TYPE(CassVarint)
   
 #undef APPEND_TYPE
   

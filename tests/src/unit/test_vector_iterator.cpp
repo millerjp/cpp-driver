@@ -97,7 +97,9 @@ TEST_F(VectorIteratorUnitTest, FailsOnInvalidCustomClassName) {
 TEST_F(VectorIteratorUnitTest, CollectionIteratorStillWorks) {
   // Create a LIST type
   DataType::ConstPtr element_type(new DataType(CASS_VALUE_TYPE_INT));
-  DataType::ConstPtr list_type(new CollectionType(CASS_COLLECTION_TYPE_LIST, element_type, false));
+  CollectionType* list_collection = new CollectionType(CASS_VALUE_TYPE_LIST, false);
+  list_collection->types().push_back(element_type);
+  DataType::ConstPtr list_type(list_collection);
   
   // Create data for list with 2 elements: [1, 2]
   // Format: count(4 bytes) + size1(4 bytes) + value1 + size2(4 bytes) + value2
@@ -120,7 +122,7 @@ TEST_F(VectorIteratorUnitTest, CollectionIteratorStillWorks) {
   Value list_value(list_type, count, decoder);
   
   // Create CollectionIterator
-  CollectionIterator* iterator = new CollectionIterator(&list_value, count);
+  CollectionIterator* iterator = new CollectionIterator(&list_value);
   
   // Should be able to iterate twice
   EXPECT_TRUE(iterator->next());

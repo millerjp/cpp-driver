@@ -121,6 +121,23 @@ CassError cass_vector_append_custom_n(CassVector* vector, const char* class_name
   return vector->append(CassCustom(StringRef(class_name, class_name_length), value, value_size));
 }
 
+CassError cass_vector_append_date(CassVector* vector, cass_uint32_t value) {
+  return vector->append(CassDate(value));
+}
+
+CassError cass_vector_append_time(CassVector* vector, cass_int64_t value) {
+  return vector->append(CassTime(value));
+}
+
+CassError cass_vector_append_timestamp(CassVector* vector, cass_int64_t value) {
+  return vector->append(CassTimestamp(value));
+}
+
+CassError cass_vector_append_varint(CassVector* vector, const cass_byte_t* varint,
+                                    size_t varint_size) {
+  return vector->append(CassVarint(varint, varint_size));
+}
+
 } // extern "C"
 
 namespace datastax { namespace internal { namespace core {

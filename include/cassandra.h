@@ -8004,6 +8004,18 @@ cass_vector_append_bool(CassVector* vector,
                        cass_bool_t value);
 
 /**
+ * Appends a null value to the vector.
+ * Note: Vectors do not support null values, this will always return an error.
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @return CASS_ERROR_LIB_NULL_VALUE as vectors don't support null values.
+ */
+CASS_EXPORT CassError
+cass_vector_append_null(CassVector* vector);
+
+/**
  * Appends an "ascii", "text" or "varchar" to the vector.
  *
  * @public @memberof CassVector
@@ -8211,6 +8223,68 @@ cass_vector_append_user_type(CassVector* vector,
 CASS_EXPORT CassError
 cass_vector_append_vector(CassVector* vector,
                          const CassVector* value);
+
+/**
+ * Appends a "date" value to the vector.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @param[in] value A date value (days since epoch as uint32)
+ * @return CASS_OK if successful, otherwise an error occurred.
+ */
+CASS_EXPORT CassError
+cass_vector_append_date(CassVector* vector,
+                        cass_uint32_t value);
+
+/**
+ * Appends a "time" value to the vector.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @param[in] value A time value (nanoseconds since midnight as int64)
+ * @return CASS_OK if successful, otherwise an error occurred.
+ */
+CASS_EXPORT CassError
+cass_vector_append_time(CassVector* vector,
+                        cass_int64_t value);
+
+/**
+ * Appends a "timestamp" value to the vector.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @param[in] value A timestamp value (milliseconds since epoch as int64)
+ * @return CASS_OK if successful, otherwise an error occurred.
+ */
+CASS_EXPORT CassError
+cass_vector_append_timestamp(CassVector* vector,
+                             cass_int64_t value);
+
+/**
+ * Appends a "varint" value to the vector.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] vector
+ * @param[in] varint The varint value as raw bytes
+ * @param[in] varint_size Size of the varint in bytes
+ * @return CASS_OK if successful, otherwise an error occurred.
+ */
+CASS_EXPORT CassError
+cass_vector_append_varint(CassVector* vector,
+                         const cass_byte_t* varint,
+                         size_t varint_size);
 
 /***********************************************************************************
  *

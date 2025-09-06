@@ -548,6 +548,34 @@ struct IsValidDataType<CassDuration> {
 };
 
 template <>
+struct IsValidDataType<CassDate> {
+  bool operator()(CassDate, const DataType::ConstPtr& data_type) const {
+    return data_type->value_type() == CASS_VALUE_TYPE_DATE;
+  }
+};
+
+template <>
+struct IsValidDataType<CassTime> {
+  bool operator()(CassTime, const DataType::ConstPtr& data_type) const {
+    return data_type->value_type() == CASS_VALUE_TYPE_TIME;
+  }
+};
+
+template <>
+struct IsValidDataType<CassTimestamp> {
+  bool operator()(CassTimestamp, const DataType::ConstPtr& data_type) const {
+    return data_type->value_type() == CASS_VALUE_TYPE_TIMESTAMP;
+  }
+};
+
+template <>
+struct IsValidDataType<CassVarint> {
+  bool operator()(CassVarint, const DataType::ConstPtr& data_type) const {
+    return data_type->value_type() == CASS_VALUE_TYPE_VARINT;
+  }
+};
+
+template <>
 struct IsValidDataType<const Collection*> {
   bool operator()(const Collection* value, const DataType::ConstPtr& data_type) const;
 };

@@ -20,6 +20,7 @@
 #include "test_utils.hpp"
 #include "cass_vector.hpp"
 #include "vector_type.hpp"
+#include "collection.hpp"
 
 using namespace datastax::internal::core;
 

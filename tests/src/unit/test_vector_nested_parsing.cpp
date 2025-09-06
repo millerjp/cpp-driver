@@ -17,8 +17,10 @@
 #include <gtest/gtest.h>
 #include "vector_type.hpp"
 #include "data_type.hpp"
+#include "string.hpp"
 
 using namespace datastax::internal::core;
+using datastax::String;
 
 class VectorNestedParsingTest : public testing::Test {
 public:

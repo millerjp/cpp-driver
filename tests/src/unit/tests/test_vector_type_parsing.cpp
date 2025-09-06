@@ -11,9 +11,11 @@
 #include "vector_type.hpp"
 #include "collection.hpp"
 #include "logger.hpp"
+#include "string.hpp"
 
 using namespace datastax::internal;
 using namespace datastax::internal::core;
+using datastax::String;
 
 class VectorTypeParsingTest : public ::testing::Test {
 protected:

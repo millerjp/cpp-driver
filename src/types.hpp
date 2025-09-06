@@ -72,6 +72,32 @@ struct CassDuration {
   cass_int64_t nanos;
 };
 
+struct CassDate {
+  explicit CassDate(cass_uint32_t days_since_epoch)
+      : days_since_epoch(days_since_epoch) {}
+  cass_uint32_t days_since_epoch;
+};
+
+struct CassTime {
+  explicit CassTime(cass_int64_t nanoseconds)
+      : nanoseconds(nanoseconds) {}
+  cass_int64_t nanoseconds;
+};
+
+struct CassTimestamp {
+  explicit CassTimestamp(cass_int64_t milliseconds)
+      : milliseconds(milliseconds) {}
+  cass_int64_t milliseconds;
+};
+
+struct CassVarint {
+  CassVarint(const cass_byte_t* data, size_t size)
+      : data(data)
+      , size(size) {}
+  const cass_byte_t* data;
+  size_t size;
+};
+
 }}} // namespace datastax::internal::core
 
 #endif

@@ -218,6 +218,30 @@ inline Buffer encode(CassDecimal value) {
   return buf;
 }
 
+inline Buffer encode(CassDate value) {
+  Buffer buf(sizeof(uint32_t));
+  buf.encode_uint32(0, value.days_since_epoch);
+  return buf;
+}
+
+inline Buffer encode(CassTime value) {
+  Buffer buf(sizeof(int64_t));
+  buf.encode_int64(0, value.nanoseconds);
+  return buf;
+}
+
+inline Buffer encode(CassTimestamp value) {
+  Buffer buf(sizeof(int64_t));
+  buf.encode_int64(0, value.milliseconds);
+  return buf;
+}
+
+inline Buffer encode(CassVarint value) {
+  Buffer buf(value.size);
+  buf.copy(0, reinterpret_cast<const char*>(value.data), value.size);
+  return buf;
+}
+
 Buffer encode(CassDuration value);
 
 Buffer encode_with_length(CassDuration value);
