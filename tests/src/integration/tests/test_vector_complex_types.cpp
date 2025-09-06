@@ -67,18 +67,12 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, ListInVector) {
   ASSERT_NE(vector, nullptr);
   EXPECT_EQ(cass_vector_dimension(vector), 2ul);
   
-  // Check element type - should be "unknown" due to server limitation
+  // Check element type - metadata parsing was fixed, now shows LIST correctly
   const CassDataType* element_type = cass_vector_element_data_type(vector);
   ASSERT_NE(element_type, nullptr);
-  ASSERT_EQ(cass_data_type_type(element_type), CASS_VALUE_TYPE_CUSTOM);
-  
-  const char* class_name;
-  size_t class_name_len;
-  ASSERT_EQ(cass_data_type_class_name(element_type, &class_name, &class_name_len), CASS_OK);
-  EXPECT_EQ(std::string(class_name, class_name_len), "unknown");
+  ASSERT_EQ(cass_data_type_type(element_type), CASS_VALUE_TYPE_LIST);
   
   // Create lists and append to vector
-  // Despite "unknown" element type, this should work due to Option 5 bypass
   CassCollection* list1 = cass_collection_new(CASS_COLLECTION_TYPE_LIST, 3);
   ASSERT_NE(list1, nullptr);
   ASSERT_EQ(cass_collection_append_int32(list1, 10), CASS_OK);

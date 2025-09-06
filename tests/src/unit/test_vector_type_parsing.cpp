@@ -16,7 +16,9 @@
 
 #include <gtest/gtest.h>
 #include "vector_type.hpp"
+#include "string.hpp"
 
+using namespace datastax;
 using namespace datastax::internal::core;
 
 class VectorTypeParsingTest : public testing::Test {
