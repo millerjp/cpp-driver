@@ -145,7 +145,6 @@ CASSANDRA_INTEGRATION_TEST_F(VectorNestedSimpleTest, VectorOfSets) {
   
   cass_statement_bind_vector(stmt, 1, vec);
   cass_vector_free(vec);
-  cass_data_type_free(set_type);
   
   CassFuture* future = cass_session_execute(session_.get(), stmt);
   cass_statement_free(stmt);
