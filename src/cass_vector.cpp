@@ -104,6 +104,119 @@ void cass_vector_free(CassVector* vector) {
   vector->dec_ref(); 
 }
 
+CassVector* cass_vector_new_list(CassValueType list_element_type, size_t dimension) {
+  if (dimension == 0 || dimension > 8192) {
+    LOG_ERROR("Cannot create vector: dimension %zu is out of range (1-8192)", dimension);
+    return NULL;
+  }
+  
+  // Validate that the element type is primitive
+  if (list_element_type == CASS_VALUE_TYPE_LIST ||
+      list_element_type == CASS_VALUE_TYPE_SET ||
+      list_element_type == CASS_VALUE_TYPE_MAP ||
+      list_element_type == CASS_VALUE_TYPE_TUPLE ||
+      list_element_type == CASS_VALUE_TYPE_UDT ||
+      list_element_type == CASS_VALUE_TYPE_CUSTOM ||
+      list_element_type == CASS_VALUE_TYPE_UNKNOWN) {
+    LOG_ERROR("Cannot create vector<list>: list element type %d is not a primitive type",
+              list_element_type);
+    return NULL;
+  }
+  
+  // Create the list data type
+  CassDataType* list_type = cass_data_type_new(CASS_VALUE_TYPE_LIST);
+  CassDataType* element_type = cass_data_type_new(list_element_type);
+  cass_data_type_add_sub_type(list_type, element_type);
+  cass_data_type_free(element_type);
+  
+  // Create the vector with the list type
+  CassVector* vector = cass_vector_new_with_element_type(list_type, dimension);
+  cass_data_type_free(list_type);
+  
+  return vector;
+}
+
+CassVector* cass_vector_new_set(CassValueType set_element_type, size_t dimension) {
+  if (dimension == 0 || dimension > 8192) {
+    LOG_ERROR("Cannot create vector: dimension %zu is out of range (1-8192)", dimension);
+    return NULL;
+  }
+  
+  // Validate that the element type is primitive
+  if (set_element_type == CASS_VALUE_TYPE_LIST ||
+      set_element_type == CASS_VALUE_TYPE_SET ||
+      set_element_type == CASS_VALUE_TYPE_MAP ||
+      set_element_type == CASS_VALUE_TYPE_TUPLE ||
+      set_element_type == CASS_VALUE_TYPE_UDT ||
+      set_element_type == CASS_VALUE_TYPE_CUSTOM ||
+      set_element_type == CASS_VALUE_TYPE_UNKNOWN) {
+    LOG_ERROR("Cannot create vector<set>: set element type %d is not a primitive type",
+              set_element_type);
+    return NULL;
+  }
+  
+  // Create the set data type
+  CassDataType* set_type = cass_data_type_new(CASS_VALUE_TYPE_SET);
+  CassDataType* element_type = cass_data_type_new(set_element_type);
+  cass_data_type_add_sub_type(set_type, element_type);
+  cass_data_type_free(element_type);
+  
+  // Create the vector with the set type
+  CassVector* vector = cass_vector_new_with_element_type(set_type, dimension);
+  cass_data_type_free(set_type);
+  
+  return vector;
+}
+
+CassVector* cass_vector_new_map(CassValueType map_key_type, 
+                                CassValueType map_value_type,
+                                size_t dimension) {
+  if (dimension == 0 || dimension > 8192) {
+    LOG_ERROR("Cannot create vector: dimension %zu is out of range (1-8192)", dimension);
+    return NULL;
+  }
+  
+  // Validate that both key and value types are primitive
+  if (map_key_type == CASS_VALUE_TYPE_LIST ||
+      map_key_type == CASS_VALUE_TYPE_SET ||
+      map_key_type == CASS_VALUE_TYPE_MAP ||
+      map_key_type == CASS_VALUE_TYPE_TUPLE ||
+      map_key_type == CASS_VALUE_TYPE_UDT ||
+      map_key_type == CASS_VALUE_TYPE_CUSTOM ||
+      map_key_type == CASS_VALUE_TYPE_UNKNOWN) {
+    LOG_ERROR("Cannot create vector<map>: map key type %d is not a primitive type",
+              map_key_type);
+    return NULL;
+  }
+  
+  if (map_value_type == CASS_VALUE_TYPE_LIST ||
+      map_value_type == CASS_VALUE_TYPE_SET ||
+      map_value_type == CASS_VALUE_TYPE_MAP ||
+      map_value_type == CASS_VALUE_TYPE_TUPLE ||
+      map_value_type == CASS_VALUE_TYPE_UDT ||
+      map_value_type == CASS_VALUE_TYPE_CUSTOM ||
+      map_value_type == CASS_VALUE_TYPE_UNKNOWN) {
+    LOG_ERROR("Cannot create vector<map>: map value type %d is not a primitive type",
+              map_value_type);
+    return NULL;
+  }
+  
+  // Create the map data type
+  CassDataType* map_type = cass_data_type_new(CASS_VALUE_TYPE_MAP);
+  CassDataType* key_type = cass_data_type_new(map_key_type);
+  CassDataType* value_type = cass_data_type_new(map_value_type);
+  cass_data_type_add_sub_type(map_type, key_type);
+  cass_data_type_add_sub_type(map_type, value_type);
+  cass_data_type_free(key_type);
+  cass_data_type_free(value_type);
+  
+  // Create the vector with the map type
+  CassVector* vector = cass_vector_new_with_element_type(map_type, dimension);
+  cass_data_type_free(map_type);
+  
+  return vector;
+}
+
 const CassDataType* cass_vector_data_type(const CassVector* vector) {
   return CassDataType::to(vector->data_type().get());
 }

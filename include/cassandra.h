@@ -7863,6 +7863,62 @@ cass_vector_new_with_element_type(const CassDataType* element_data_type,
                                   size_t dimension);
 
 /**
+ * Creates a new vector with list elements of a specific type.
+ * This is a convenience function that creates a vector<list<element_type>>.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] list_element_type The type of elements in the lists (e.g., CASS_VALUE_TYPE_TEXT)
+ * @param[in] dimension The fixed number of lists in the vector (1-8192)
+ * @return Returns a new vector that must be freed, or NULL if invalid parameters.
+ *
+ * @see cass_vector_free()
+ */
+CASS_EXPORT CassVector*
+cass_vector_new_list(CassValueType list_element_type,
+                     size_t dimension);
+
+/**
+ * Creates a new vector with set elements of a specific type.
+ * This is a convenience function that creates a vector<set<element_type>>.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] set_element_type The type of elements in the sets (e.g., CASS_VALUE_TYPE_TEXT)
+ * @param[in] dimension The fixed number of sets in the vector (1-8192)
+ * @return Returns a new vector that must be freed, or NULL if invalid parameters.
+ *
+ * @see cass_vector_free()
+ */
+CASS_EXPORT CassVector*
+cass_vector_new_set(CassValueType set_element_type,
+                    size_t dimension);
+
+/**
+ * Creates a new vector with map elements of specific key and value types.
+ * This is a convenience function that creates a vector<map<key_type, value_type>>.
+ *
+ * @cassandra{5.0+}
+ *
+ * @public @memberof CassVector
+ *
+ * @param[in] map_key_type The type of keys in the maps (e.g., CASS_VALUE_TYPE_TEXT)
+ * @param[in] map_value_type The type of values in the maps (e.g., CASS_VALUE_TYPE_INT)
+ * @param[in] dimension The fixed number of maps in the vector (1-8192)
+ * @return Returns a new vector that must be freed, or NULL if invalid parameters.
+ *
+ * @see cass_vector_free()
+ */
+CASS_EXPORT CassVector*
+cass_vector_new_map(CassValueType map_key_type,
+                    CassValueType map_value_type,
+                    size_t dimension);
+
+/**
  * Frees a vector instance.
  *
  * @cassandra{5.0+}
