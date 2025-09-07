@@ -121,14 +121,9 @@ CASSANDRA_INTEGRATION_TEST_F(VectorNestedSimpleTest, VectorOfSets) {
                    "id int PRIMARY KEY, "
                    "sets vector<frozen<set<text>>, 3>)");
   
-  // Create the element type: set<text>
-  CassDataType* text_type = cass_data_type_new(CASS_VALUE_TYPE_TEXT);
-  CassDataType* set_type = cass_data_type_new(CASS_VALUE_TYPE_SET);
-  cass_data_type_add_sub_type(set_type, text_type);
-  cass_data_type_free(text_type);
-  
-  // Create vector with the proper element type
-  CassVector* vec = cass_vector_new_with_element_type(set_type, 3);
+  // Create vector<set<text>> using the new convenience API
+  // Much simpler than manually constructing the data type!
+  CassVector* vec = cass_vector_new_set(CASS_VALUE_TYPE_TEXT, 3);
   ASSERT_NE(vec, nullptr) << "Failed to create vector with set<text> element type";
   
   // Insert using simple statement
