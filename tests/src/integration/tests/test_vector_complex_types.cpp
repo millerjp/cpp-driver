@@ -23,16 +23,6 @@ class VectorComplexTypeTest : public Integration {
 public:
   void SetUp() {
     Integration::SetUp();
-    
-    // Create test keyspace
-    session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_complex "
-                     "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
-    session_.execute("USE vector_complex");
-  }
-  
-  void TearDown() {
-    session_.execute("DROP KEYSPACE IF EXISTS vector_complex");
-    Integration::TearDown();
   }
 };
 
@@ -47,7 +37,12 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, ListInVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
+  
+  // Create test keyspace
+  session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_complex "
+                   "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+  session_.execute("USE vector_complex");
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_list ("
@@ -160,7 +155,12 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, ListInVector) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, SetInVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
+  
+  // Create test keyspace
+  session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_complex "
+                   "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+  session_.execute("USE vector_complex");
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_set ("
@@ -235,7 +235,12 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, SetInVector) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, ServerSideValidation) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
+  
+  // Create test keyspace
+  session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_complex "
+                   "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+  session_.execute("USE vector_complex");
   
   // Create table expecting list<int>
   session_.execute("CREATE TABLE IF NOT EXISTS test_validation ("
@@ -295,7 +300,12 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, ServerSideValidation) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, SimpleStatementComplexVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
+  
+  // Create test keyspace
+  session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_complex "
+                   "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+  session_.execute("USE vector_complex");
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_simple ("
@@ -303,44 +313,46 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComplexTypeTest, SimpleStatementComplexVector
                    "vec vector<list<int>, 2>)");
   
   // For simple statements, we don't have prepared metadata
-  // We need to create the vector with just dimension info
-  CassVector* vector = cass_vector_new(CASS_VALUE_TYPE_LIST, 2);
-  ASSERT_NE(vector, nullptr);
+  // We need to use the new API with explicit element type
+  
+  // Create list<int> data type
+  CassDataType* int_type = cass_data_type_new(CASS_VALUE_TYPE_INT);
+  CassDataType* list_type = cass_data_type_new(CASS_VALUE_TYPE_LIST);
+  cass_data_type_add_sub_type(list_type, int_type);
+  cass_data_type_free(int_type);
+  
+  // Create vector with proper element type
+  CassVector* vector = cass_vector_new_with_element_type(list_type, 2);
+  ASSERT_NE(vector, nullptr) << "Should be able to create vector with list<int> element type";
   
   // Create lists
   CassCollection* list1 = cass_collection_new(CASS_COLLECTION_TYPE_LIST, 2);
   ASSERT_EQ(cass_collection_append_int32(list1, 100), CASS_OK);
   ASSERT_EQ(cass_collection_append_int32(list1, 200), CASS_OK);
   
-  // For simple statements without type info, this might fail
+  // Now this should work with the proper type info
   CassError rc = cass_vector_append_collection(vector, list1);
+  ASSERT_EQ(rc, CASS_OK) << "Should be able to append list to vector with proper type";
   cass_collection_free(list1);
   
-  if (rc == CASS_OK) {
-    // If it works, add second list and try to execute
-    CassCollection* list2 = cass_collection_new(CASS_COLLECTION_TYPE_LIST, 1);
-    ASSERT_EQ(cass_collection_append_int32(list2, 300), CASS_OK);
-    ASSERT_EQ(cass_vector_append_collection(vector, list2), CASS_OK);
-    cass_collection_free(list2);
-    
-    CassStatement* stmt = cass_statement_new("INSERT INTO test_simple (id, vec) VALUES (?, ?)", 2);
-    ASSERT_EQ(cass_statement_bind_int32(stmt, 0, 1), CASS_OK);
-    ASSERT_EQ(cass_statement_bind_vector(stmt, 1, vector), CASS_OK);
-    
-    CassFuture* future = cass_session_execute(session_.get(), stmt);
-    CassError exec_rc = cass_future_error_code(future);
-    
-    if (exec_rc == CASS_OK) {
-      TEST_LOG("Simple statement with complex vector succeeded");
-    } else {
-      TEST_LOG("Simple statement with complex vector failed (expected without type info)");
-    }
-    
-    cass_future_free(future);
-    cass_statement_free(stmt);
-  } else {
-    TEST_LOG("Cannot append collection to vector without proper type info (expected)");
-  }
+  // Add second list
+  CassCollection* list2 = cass_collection_new(CASS_COLLECTION_TYPE_LIST, 1);
+  ASSERT_EQ(cass_collection_append_int32(list2, 300), CASS_OK);
+  ASSERT_EQ(cass_vector_append_collection(vector, list2), CASS_OK);
+  cass_collection_free(list2);
+  
+  CassStatement* stmt = cass_statement_new("INSERT INTO test_simple (id, vec) VALUES (?, ?)", 2);
+  ASSERT_EQ(cass_statement_bind_int32(stmt, 0, 1), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(stmt, 1, vector), CASS_OK);
+  
+  CassFuture* future = cass_session_execute(session_.get(), stmt);
+  CassError exec_rc = cass_future_error_code(future);
+  ASSERT_EQ(exec_rc, CASS_OK) << "Simple statement with complex vector should succeed with new API";
+  TEST_LOG("Simple statement with complex vector succeeded using cass_vector_new_with_element_type");
+  
+  cass_future_free(future);
+  cass_statement_free(stmt);
   
   cass_vector_free(vector);
+  cass_data_type_free(list_type);
 }

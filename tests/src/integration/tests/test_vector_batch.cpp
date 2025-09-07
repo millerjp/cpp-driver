@@ -24,17 +24,6 @@ class VectorBatchTest : public Integration {
 public:
   void SetUp() {
     Integration::SetUp();
-    
-    // Vectors require Cassandra 5.0+
-    if (!Options::is_cassandra() || server_version_ < "5.0.0") {
-      SKIP_TEST("Vector types require Cassandra 5.0+");
-    }
-    
-    session_.execute(
-        format_string("CREATE KEYSPACE IF NOT EXISTS %s "
-                     "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}", 
-                     keyspace_name_.c_str()));
-    session_.execute("USE " + keyspace_name_);
   }
 };
 
@@ -47,6 +36,12 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorBatchTest, BatchInsertVectors) {
   CHECK_FAILURE;
+  CHECK_VERSION(5.0.5);
+  
+  // Create keyspace and use it
+  session_.execute("CREATE KEYSPACE IF NOT EXISTS test_batch_vectors "
+                   "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+  session_.execute("USE test_batch_vectors");
   
   // Create table with multiple vector columns
   session_.execute("CREATE TABLE IF NOT EXISTS batch_vectors ("

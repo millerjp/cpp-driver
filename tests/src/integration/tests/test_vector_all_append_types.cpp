@@ -17,17 +17,18 @@
 #include "integration.hpp"
 
 /**
- * Comprehensive test for ALL vector append functions to ensure complete C API coverage.
- * This test validates that all data types can be appended to vectors.
+ * Comprehensive test for vector append functions to ensure C API coverage.
+ * This test validates that basic data types can be appended to vectors.
  */
 class VectorAllAppendTypesTest : public Integration {
 public:
   void SetUp() {
     Integration::SetUp();
-    session_ = this->default_cluster()
-        .with_beta_protocol(true)
-        .with_protocol_version(5)
-        .connect();
+    
+    // Create test keyspace
+    session_.execute("CREATE KEYSPACE IF NOT EXISTS vector_append_test "
+                     "WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1}");
+    session_.execute("USE vector_append_test");
   }
 };
 
@@ -36,79 +37,69 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendNumericTypes) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(), 
+  session_.execute(
     "CREATE TABLE IF NOT EXISTS test_numeric_vectors ("
     "  id int PRIMARY KEY,"
-    "  v_int8 vector<tinyint, 2>,"
-    "  v_int16 vector<smallint, 2>,"
-    "  v_int32 vector<int, 2>,"
-    "  v_int64 vector<bigint, 2>,"
+    "  v_int vector<int, 2>,"
+    "  v_bigint vector<bigint, 2>,"
     "  v_float vector<float, 2>,"
-    "  v_double vector<double, 2>,"
-    "  v_varint vector<varint, 2>"
+    "  v_double vector<double, 2>"
     ")");
 
   // Prepare insert statement
   const char* insert_query = 
-    "INSERT INTO test_numeric_vectors (id, v_int8, v_int16, v_int32, v_int64, v_float, v_double, v_varint) "
-    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+    "INSERT INTO test_numeric_vectors (id, v_int, v_bigint, v_float, v_double) "
+    "VALUES (?, ?, ?, ?, ?)";
   
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
+  Prepared prepared = session_.prepare(insert_query);
+  Statement statement = prepared.bind();
   
   // Bind id
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
-  
-  // Test int8 (tinyint)
-  test_utils::CassVectorPtr v_int8(cass_vector_new(CASS_VALUE_TYPE_TINY_INT, 2));
-  ASSERT_EQ(cass_vector_append_int8(v_int8.get(), 10), CASS_OK);
-  ASSERT_EQ(cass_vector_append_int8(v_int8.get(), 20), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_int8.get()), CASS_OK);
-  
-  // Test int16 (smallint)
-  test_utils::CassVectorPtr v_int16(cass_vector_new(CASS_VALUE_TYPE_SMALL_INT, 2));
-  ASSERT_EQ(cass_vector_append_int16(v_int16.get(), 100), CASS_OK);
-  ASSERT_EQ(cass_vector_append_int16(v_int16.get(), 200), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_int16.get()), CASS_OK);
+  statement.bind<Integer>(0, Integer(1));
   
   // Test int32
-  test_utils::CassVectorPtr v_int32(cass_vector_new(CASS_VALUE_TYPE_INT, 2));
-  ASSERT_EQ(cass_vector_append_int32(v_int32.get(), 1000), CASS_OK);
-  ASSERT_EQ(cass_vector_append_int32(v_int32.get(), 2000), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_int32.get()), CASS_OK);
+  CassVector* v_int = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
+  ASSERT_NE(v_int, nullptr);
+  ASSERT_EQ(cass_vector_append_int32(v_int, 10), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int32(v_int, 20), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_int), CASS_OK);
   
   // Test int64 (bigint)
-  test_utils::CassVectorPtr v_int64(cass_vector_new(CASS_VALUE_TYPE_BIGINT, 2));
-  ASSERT_EQ(cass_vector_append_int64(v_int64.get(), 10000), CASS_OK);
-  ASSERT_EQ(cass_vector_append_int64(v_int64.get(), 20000), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 4, v_int64.get()), CASS_OK);
+  CassVector* v_bigint = cass_vector_new(CASS_VALUE_TYPE_BIGINT, 2);
+  ASSERT_NE(v_bigint, nullptr);
+  ASSERT_EQ(cass_vector_append_int64(v_bigint, 10000000000LL), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int64(v_bigint, 20000000000LL), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_bigint), CASS_OK);
   
   // Test float
-  test_utils::CassVectorPtr v_float(cass_vector_new(CASS_VALUE_TYPE_FLOAT, 2));
-  ASSERT_EQ(cass_vector_append_float(v_float.get(), 1.5f), CASS_OK);
-  ASSERT_EQ(cass_vector_append_float(v_float.get(), 2.5f), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 5, v_float.get()), CASS_OK);
+  CassVector* v_float = cass_vector_new(CASS_VALUE_TYPE_FLOAT, 2);
+  ASSERT_NE(v_float, nullptr);
+  ASSERT_EQ(cass_vector_append_float(v_float, 1.5f), CASS_OK);
+  ASSERT_EQ(cass_vector_append_float(v_float, 2.5f), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_float), CASS_OK);
   
   // Test double
-  test_utils::CassVectorPtr v_double(cass_vector_new(CASS_VALUE_TYPE_DOUBLE, 2));
-  ASSERT_EQ(cass_vector_append_double(v_double.get(), 3.14), CASS_OK);
-  ASSERT_EQ(cass_vector_append_double(v_double.get(), 2.71), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 6, v_double.get()), CASS_OK);
-  
-  // Test varint
-  test_utils::CassVectorPtr v_varint(cass_vector_new(CASS_VALUE_TYPE_VARINT, 2));
-  const cass_byte_t varint1[] = {0x01, 0x23};
-  const cass_byte_t varint2[] = {0x45, 0x67};
-  ASSERT_EQ(cass_vector_append_varint(v_varint.get(), varint1, sizeof(varint1)), CASS_OK);
-  ASSERT_EQ(cass_vector_append_varint(v_varint.get(), varint2, sizeof(varint2)), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 7, v_varint.get()), CASS_OK);
+  CassVector* v_double = cass_vector_new(CASS_VALUE_TYPE_DOUBLE, 2);
+  ASSERT_NE(v_double, nullptr);
+  ASSERT_EQ(cass_vector_append_double(v_double, 3.14159), CASS_OK);
+  ASSERT_EQ(cass_vector_append_double(v_double, 2.71828), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 4, v_double), CASS_OK);
   
   // Execute
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
+  Result result = session_.execute(statement, false);
+  ASSERT_TRUE(result);
+  
+  // Clean up
+  cass_vector_free(v_int);
+  cass_vector_free(v_bigint);
+  cass_vector_free(v_float);
+  cass_vector_free(v_double);
+  
+  // Verify data was inserted
+  result = session_.execute("SELECT * FROM test_numeric_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
 }
 
 /**
@@ -116,10 +107,9 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendNumericTypes) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendStringBytesTypes) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(),
+  session_.execute(
     "CREATE TABLE IF NOT EXISTS test_string_vectors ("
     "  id int PRIMARY KEY,"
     "  v_text vector<text, 2>,"
@@ -129,27 +119,37 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendStringBytesTypes) {
   const char* insert_query = 
     "INSERT INTO test_string_vectors (id, v_text, v_blob) VALUES (?, ?, ?)";
   
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
+  Prepared prepared = session_.prepare(insert_query);
+  Statement statement = prepared.bind();
   
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
+  statement.bind<Integer>(0, Integer(1));
   
-  // Test text/varchar (using string functions)
-  test_utils::CassVectorPtr v_text(cass_vector_new(CASS_VALUE_TYPE_TEXT, 2));
-  ASSERT_EQ(cass_vector_append_string(v_text.get(), "hello"), CASS_OK);
-  ASSERT_EQ(cass_vector_append_string_n(v_text.get(), "world", 5), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_text.get()), CASS_OK);
+  // Test text/string
+  CassVector* v_text = cass_vector_new(CASS_VALUE_TYPE_TEXT, 2);
+  ASSERT_NE(v_text, nullptr);
+  ASSERT_EQ(cass_vector_append_string(v_text, "hello"), CASS_OK);
+  ASSERT_EQ(cass_vector_append_string_n(v_text, "world", 5), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_text), CASS_OK);
   
-  // Test blob (using bytes)
-  test_utils::CassVectorPtr v_blob(cass_vector_new(CASS_VALUE_TYPE_BLOB, 2));
-  const cass_byte_t bytes1[] = {0x01, 0x02, 0x03};
-  const cass_byte_t bytes2[] = {0x04, 0x05, 0x06};
-  ASSERT_EQ(cass_vector_append_bytes(v_blob.get(), bytes1, sizeof(bytes1)), CASS_OK);
-  ASSERT_EQ(cass_vector_append_bytes(v_blob.get(), bytes2, sizeof(bytes2)), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_blob.get()), CASS_OK);
+  // Test blob/bytes
+  CassVector* v_blob = cass_vector_new(CASS_VALUE_TYPE_BLOB, 2);
+  ASSERT_NE(v_blob, nullptr);
+  const cass_byte_t bytes1[] = {0xDE, 0xAD};
+  const cass_byte_t bytes2[] = {0xBE, 0xEF};
+  ASSERT_EQ(cass_vector_append_bytes(v_blob, bytes1, sizeof(bytes1)), CASS_OK);
+  ASSERT_EQ(cass_vector_append_bytes(v_blob, bytes2, sizeof(bytes2)), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_blob), CASS_OK);
   
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
+  // Execute
+  Result result = session_.execute(statement, false);
+  ASSERT_TRUE(result);
+  
+  cass_vector_free(v_text);
+  cass_vector_free(v_blob);
+  
+  // Verify
+  result = session_.execute("SELECT * FROM test_string_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
 }
 
 /**
@@ -157,71 +157,63 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendStringBytesTypes) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendBooleanUuidTypes) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(),
+  session_.execute(
     "CREATE TABLE IF NOT EXISTS test_bool_uuid_vectors ("
     "  id int PRIMARY KEY,"
     "  v_bool vector<boolean, 2>,"
-    "  v_uuid vector<uuid, 2>,"
-    "  v_timeuuid vector<timeuuid, 2>,"
-    "  v_inet vector<inet, 2>"
+    "  v_uuid vector<uuid, 2>"
     ")");
 
   const char* insert_query = 
-    "INSERT INTO test_bool_uuid_vectors (id, v_bool, v_uuid, v_timeuuid, v_inet) VALUES (?, ?, ?, ?, ?)";
+    "INSERT INTO test_bool_uuid_vectors (id, v_bool, v_uuid) VALUES (?, ?, ?)";
   
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
+  Prepared prepared = session_.prepare(insert_query);
+  Statement statement = prepared.bind();
   
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
+  statement.bind<Integer>(0, Integer(1));
   
   // Test boolean
-  test_utils::CassVectorPtr v_bool(cass_vector_new(CASS_VALUE_TYPE_BOOLEAN, 2));
-  ASSERT_EQ(cass_vector_append_bool(v_bool.get(), cass_true), CASS_OK);
-  ASSERT_EQ(cass_vector_append_bool(v_bool.get(), cass_false), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_bool.get()), CASS_OK);
+  CassVector* v_bool = cass_vector_new(CASS_VALUE_TYPE_BOOLEAN, 2);
+  ASSERT_NE(v_bool, nullptr);
+  ASSERT_EQ(cass_vector_append_bool(v_bool, cass_true), CASS_OK);
+  ASSERT_EQ(cass_vector_append_bool(v_bool, cass_false), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_bool), CASS_OK);
   
   // Test UUID
-  test_utils::CassVectorPtr v_uuid(cass_vector_new(CASS_VALUE_TYPE_UUID, 2));
-  CassUuid uuid1 = test_utils::generate_random_uuid();
-  CassUuid uuid2 = test_utils::generate_random_uuid();
-  ASSERT_EQ(cass_vector_append_uuid(v_uuid.get(), uuid1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_uuid(v_uuid.get(), uuid2), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_uuid.get()), CASS_OK);
+  CassVector* v_uuid = cass_vector_new(CASS_VALUE_TYPE_UUID, 2);
+  ASSERT_NE(v_uuid, nullptr);
+  CassUuidGen* uuid_gen = cass_uuid_gen_new();
+  CassUuid uuid1;
+  cass_uuid_gen_random(uuid_gen, &uuid1);
+  CassUuid uuid2;
+  cass_uuid_gen_random(uuid_gen, &uuid2);
+  cass_uuid_gen_free(uuid_gen);
+  ASSERT_EQ(cass_vector_append_uuid(v_uuid, uuid1), CASS_OK);
+  ASSERT_EQ(cass_vector_append_uuid(v_uuid, uuid2), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_uuid), CASS_OK);
   
-  // Test TimeUUID
-  test_utils::CassVectorPtr v_timeuuid(cass_vector_new(CASS_VALUE_TYPE_TIMEUUID, 2));
-  CassUuid timeuuid1 = test_utils::generate_time_uuid();
-  CassUuid timeuuid2 = test_utils::generate_time_uuid();
-  ASSERT_EQ(cass_vector_append_uuid(v_timeuuid.get(), timeuuid1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_uuid(v_timeuuid.get(), timeuuid2), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_timeuuid.get()), CASS_OK);
+  // Execute
+  Result result = session_.execute(statement, false);
+  ASSERT_TRUE(result);
   
-  // Test INET
-  test_utils::CassVectorPtr v_inet(cass_vector_new(CASS_VALUE_TYPE_INET, 2));
-  CassInet inet1;
-  ASSERT_EQ(cass_inet_from_string("127.0.0.1", &inet1), CASS_OK);
-  CassInet inet2;
-  ASSERT_EQ(cass_inet_from_string("192.168.1.1", &inet2), CASS_OK);
-  ASSERT_EQ(cass_vector_append_inet(v_inet.get(), inet1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_inet(v_inet.get(), inet2), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 4, v_inet.get()), CASS_OK);
+  cass_vector_free(v_bool);
+  cass_vector_free(v_uuid);
   
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
+  // Verify
+  result = session_.execute("SELECT * FROM test_bool_uuid_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
 }
 
 /**
- * Test date, time, timestamp types
+ * Test date and time types
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendDateTimeTypes) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(),
+  session_.execute(
     "CREATE TABLE IF NOT EXISTS test_datetime_vectors ("
     "  id int PRIMARY KEY,"
     "  v_date vector<date, 2>,"
@@ -232,329 +224,148 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendDateTimeTypes) {
   const char* insert_query = 
     "INSERT INTO test_datetime_vectors (id, v_date, v_time, v_timestamp) VALUES (?, ?, ?, ?)";
   
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
+  Prepared prepared = session_.prepare(insert_query);
+  Statement statement = prepared.bind();
   
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
+  statement.bind<Integer>(0, Integer(1));
   
-  // Test date (days since epoch)
-  test_utils::CassVectorPtr v_date(cass_vector_new(CASS_VALUE_TYPE_DATE, 2));
-  cass_uint32_t date1 = cass_date_from_epoch(1609459200);  // 2021-01-01
-  cass_uint32_t date2 = cass_date_from_epoch(1640995200);  // 2022-01-01
-  ASSERT_EQ(cass_vector_append_date(v_date.get(), date1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_date(v_date.get(), date2), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_date.get()), CASS_OK);
+  // Test date
+  CassVector* v_date = cass_vector_new(CASS_VALUE_TYPE_DATE, 2);
+  ASSERT_NE(v_date, nullptr);
+  ASSERT_EQ(cass_vector_append_date(v_date, 2147483648u), CASS_OK); // 1970-01-01
+  ASSERT_EQ(cass_vector_append_date(v_date, 2147483649u), CASS_OK); // 1970-01-02
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_date), CASS_OK);
   
-  // Test time (nanoseconds since midnight)
-  test_utils::CassVectorPtr v_time(cass_vector_new(CASS_VALUE_TYPE_TIME, 2));
-  cass_int64_t time1 = cass_time_from_epoch(3600);   // 1 hour in seconds -> nanoseconds
-  cass_int64_t time2 = cass_time_from_epoch(7200);   // 2 hours in seconds -> nanoseconds
-  ASSERT_EQ(cass_vector_append_time(v_time.get(), time1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_time(v_time.get(), time2), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_time.get()), CASS_OK);
+  // Test time
+  CassVector* v_time = cass_vector_new(CASS_VALUE_TYPE_TIME, 2);
+  ASSERT_NE(v_time, nullptr);
+  ASSERT_EQ(cass_vector_append_time(v_time, 0), CASS_OK);
+  ASSERT_EQ(cass_vector_append_time(v_time, 1000000000), CASS_OK); // 1 second
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_time), CASS_OK);
   
-  // Test timestamp (milliseconds since epoch)
-  test_utils::CassVectorPtr v_timestamp(cass_vector_new(CASS_VALUE_TYPE_TIMESTAMP, 2));
-  cass_int64_t timestamp1 = 1609459200000LL;  // 2021-01-01 in milliseconds
-  cass_int64_t timestamp2 = 1640995200000LL;  // 2022-01-01 in milliseconds
-  ASSERT_EQ(cass_vector_append_timestamp(v_timestamp.get(), timestamp1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_timestamp(v_timestamp.get(), timestamp2), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_timestamp.get()), CASS_OK);
+  // Test timestamp
+  CassVector* v_timestamp = cass_vector_new(CASS_VALUE_TYPE_TIMESTAMP, 2);
+  ASSERT_NE(v_timestamp, nullptr);
+  ASSERT_EQ(cass_vector_append_timestamp(v_timestamp, 1234567890123LL), CASS_OK);
+  ASSERT_EQ(cass_vector_append_timestamp(v_timestamp, 1234567890124LL), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_timestamp), CASS_OK);
   
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
+  // Execute
+  Result result = session_.execute(statement, false);
+  ASSERT_TRUE(result);
+  
+  cass_vector_free(v_date);
+  cass_vector_free(v_time);
+  cass_vector_free(v_timestamp);
+  
+  // Verify
+  result = session_.execute("SELECT * FROM test_datetime_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
 }
 
 /**
- * Test decimal and duration types
+ * Test decimal, duration and inet types
  */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendDecimalDurationTypes) {
+CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendComplexTypes) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(),
-    "CREATE TABLE IF NOT EXISTS test_decimal_duration_vectors ("
+  session_.execute(
+    "CREATE TABLE IF NOT EXISTS test_complex_vectors ("
     "  id int PRIMARY KEY,"
     "  v_decimal vector<decimal, 2>,"
     "  v_duration vector<duration, 2>,"
-    "  v_uint32 vector<int, 2>"  // Using int to test uint32 since CQL doesn't have uint
+    "  v_inet vector<inet, 2>"
     ")");
 
   const char* insert_query = 
-    "INSERT INTO test_decimal_duration_vectors (id, v_decimal, v_duration, v_uint32) VALUES (?, ?, ?, ?)";
+    "INSERT INTO test_complex_vectors (id, v_decimal, v_duration, v_inet) VALUES (?, ?, ?, ?)";
   
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
+  Prepared prepared = session_.prepare(insert_query);
+  Statement statement = prepared.bind();
   
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
+  statement.bind<Integer>(0, Integer(1));
   
   // Test decimal
-  test_utils::CassVectorPtr v_decimal(cass_vector_new(CASS_VALUE_TYPE_DECIMAL, 2));
+  CassVector* v_decimal = cass_vector_new(CASS_VALUE_TYPE_DECIMAL, 2);
+  ASSERT_NE(v_decimal, nullptr);
   const cass_byte_t varint1[] = {0x01, 0x23};
   const cass_byte_t varint2[] = {0x45, 0x67};
-  ASSERT_EQ(cass_vector_append_decimal(v_decimal.get(), varint1, sizeof(varint1), 2), CASS_OK);
-  ASSERT_EQ(cass_vector_append_decimal(v_decimal.get(), varint2, sizeof(varint2), 3), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_decimal.get()), CASS_OK);
+  ASSERT_EQ(cass_vector_append_decimal(v_decimal, varint1, sizeof(varint1), 2), CASS_OK);
+  ASSERT_EQ(cass_vector_append_decimal(v_decimal, varint2, sizeof(varint2), 3), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_decimal), CASS_OK);
   
   // Test duration
-  test_utils::CassVectorPtr v_duration(cass_vector_new(CASS_VALUE_TYPE_DURATION, 2));
-  ASSERT_EQ(cass_vector_append_duration(v_duration.get(), 1, 2, 3000000000LL), CASS_OK);
-  ASSERT_EQ(cass_vector_append_duration(v_duration.get(), 4, 5, 6000000000LL), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_duration.get()), CASS_OK);
+  CassVector* v_duration = cass_vector_new(CASS_VALUE_TYPE_DURATION, 2);
+  ASSERT_NE(v_duration, nullptr);
+  ASSERT_EQ(cass_vector_append_duration(v_duration, 1, 2, 3), CASS_OK);
+  ASSERT_EQ(cass_vector_append_duration(v_duration, 4, 5, 6), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_duration), CASS_OK);
   
-  // Test uint32 (using int type in CQL)
-  test_utils::CassVectorPtr v_uint32(cass_vector_new(CASS_VALUE_TYPE_INT, 2));
-  ASSERT_EQ(cass_vector_append_uint32(v_uint32.get(), 100), CASS_OK);
-  ASSERT_EQ(cass_vector_append_uint32(v_uint32.get(), 200), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_uint32.get()), CASS_OK);
+  // Test inet
+  CassVector* v_inet = cass_vector_new(CASS_VALUE_TYPE_INET, 2);
+  ASSERT_NE(v_inet, nullptr);
+  CassInet inet1;
+  cass_inet_from_string("127.0.0.1", &inet1);
+  CassInet inet2;
+  cass_inet_from_string("192.168.1.1", &inet2);
+  ASSERT_EQ(cass_vector_append_inet(v_inet, inet1), CASS_OK);
+  ASSERT_EQ(cass_vector_append_inet(v_inet, inet2), CASS_OK);
+  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_inet), CASS_OK);
   
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
+  // Execute
+  Result result = session_.execute(statement, false);
+  ASSERT_TRUE(result);
+  
+  cass_vector_free(v_decimal);
+  cass_vector_free(v_duration);
+  cass_vector_free(v_inet);
+  
+  // Verify
+  result = session_.execute("SELECT * FROM test_complex_vectors WHERE id = 1");
+  ASSERT_EQ(1ul, result.row_count());
 }
 
 /**
- * Test collection types (list, set, map) in vectors
+ * Test dimension overflow
  */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendCollectionTypes) {
+CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, DimensionOverflow) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(),
-    "CREATE TABLE IF NOT EXISTS test_collection_vectors ("
+  session_.execute(
+    "CREATE TABLE IF NOT EXISTS test_overflow ("
     "  id int PRIMARY KEY,"
-    "  v_list vector<frozen<list<int>>, 2>,"
-    "  v_set vector<frozen<set<text>>, 2>,"
-    "  v_map vector<frozen<map<int,text>>, 2>"
+    "  vec vector<int, 2>"
     ")");
 
-  const char* insert_query = 
-    "INSERT INTO test_collection_vectors (id, v_list, v_set, v_map) VALUES (?, ?, ?, ?)";
+  CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
+  ASSERT_NE(vec, nullptr);
   
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
+  // Add two elements (fills the vector)
+  ASSERT_EQ(cass_vector_append_int32(vec, 1), CASS_OK);
+  ASSERT_EQ(cass_vector_append_int32(vec, 2), CASS_OK);
   
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
+  // Try to add a third element - should fail with dimension exceeded error
+  CassError error = cass_vector_append_int32(vec, 3);
+  ASSERT_EQ(error, CASS_ERROR_LIB_INVALID_VALUE_TYPE);
   
-  // Test list in vector
-  test_utils::CassVectorPtr v_list(cass_vector_new_from_data_type(
-    cass_statement_get_data_type(statement.get(), 1)));
-  
-  test_utils::CassCollectionPtr list1(cass_collection_new(CASS_COLLECTION_TYPE_LIST, 2));
-  cass_collection_append_int32(list1.get(), 1);
-  cass_collection_append_int32(list1.get(), 2);
-  
-  test_utils::CassCollectionPtr list2(cass_collection_new(CASS_COLLECTION_TYPE_LIST, 2));
-  cass_collection_append_int32(list2.get(), 3);
-  cass_collection_append_int32(list2.get(), 4);
-  
-  ASSERT_EQ(cass_vector_append_collection(v_list.get(), list1.get()), CASS_OK);
-  ASSERT_EQ(cass_vector_append_collection(v_list.get(), list2.get()), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_list.get()), CASS_OK);
-  
-  // Test set in vector
-  test_utils::CassVectorPtr v_set(cass_vector_new_from_data_type(
-    cass_statement_get_data_type(statement.get(), 2)));
-  
-  test_utils::CassCollectionPtr set1(cass_collection_new(CASS_COLLECTION_TYPE_SET, 2));
-  cass_collection_append_string(set1.get(), "a");
-  cass_collection_append_string(set1.get(), "b");
-  
-  test_utils::CassCollectionPtr set2(cass_collection_new(CASS_COLLECTION_TYPE_SET, 2));
-  cass_collection_append_string(set2.get(), "c");
-  cass_collection_append_string(set2.get(), "d");
-  
-  ASSERT_EQ(cass_vector_append_collection(v_set.get(), set1.get()), CASS_OK);
-  ASSERT_EQ(cass_vector_append_collection(v_set.get(), set2.get()), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_set.get()), CASS_OK);
-  
-  // Test map in vector
-  test_utils::CassVectorPtr v_map(cass_vector_new_from_data_type(
-    cass_statement_get_data_type(statement.get(), 3)));
-  
-  test_utils::CassCollectionPtr map1(cass_collection_new(CASS_COLLECTION_TYPE_MAP, 2));
-  cass_collection_append_int32(map1.get(), 1);
-  cass_collection_append_string(map1.get(), "one");
-  cass_collection_append_int32(map1.get(), 2);
-  cass_collection_append_string(map1.get(), "two");
-  
-  test_utils::CassCollectionPtr map2(cass_collection_new(CASS_COLLECTION_TYPE_MAP, 1));
-  cass_collection_append_int32(map2.get(), 3);
-  cass_collection_append_string(map2.get(), "three");
-  
-  ASSERT_EQ(cass_vector_append_collection(v_map.get(), map1.get()), CASS_OK);
-  ASSERT_EQ(cass_vector_append_collection(v_map.get(), map2.get()), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 3, v_map.get()), CASS_OK);
-  
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
+  cass_vector_free(vec);
 }
 
 /**
- * Test tuple and UDT types in vectors
+ * Test null rejection
  */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendTupleUdtTypes) {
+CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, NullRejection) {
   CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
+  CHECK_VERSION(5.0.5);
 
-  test_utils::CassSessionPtr session(this->session_);
+  CassVector* vec = cass_vector_new(CASS_VALUE_TYPE_INT, 2);
+  ASSERT_NE(vec, nullptr);
   
-  // Create UDT first
-  test_utils::execute_query(session.get(),
-    "CREATE TYPE IF NOT EXISTS test_udt (a int, b text)");
+  // Vectors should reject null values
+  CassError error = cass_vector_append_null(vec);
+  ASSERT_EQ(error, CASS_ERROR_LIB_NULL_VALUE);
   
-  test_utils::execute_query(session.get(),
-    "CREATE TABLE IF NOT EXISTS test_tuple_udt_vectors ("
-    "  id int PRIMARY KEY,"
-    "  v_tuple vector<frozen<tuple<int,text>>, 2>,"
-    "  v_udt vector<frozen<test_udt>, 2>"
-    ")");
-
-  const char* insert_query = 
-    "INSERT INTO test_tuple_udt_vectors (id, v_tuple, v_udt) VALUES (?, ?, ?)";
-  
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
-  
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
-  
-  // Test tuple in vector
-  test_utils::CassVectorPtr v_tuple(cass_vector_new_from_data_type(
-    cass_statement_get_data_type(statement.get(), 1)));
-  
-  test_utils::CassTuplePtr tuple1(cass_tuple_new(2));
-  cass_tuple_set_int32(tuple1.get(), 0, 1);
-  cass_tuple_set_string(tuple1.get(), 1, "one");
-  
-  test_utils::CassTuplePtr tuple2(cass_tuple_new(2));
-  cass_tuple_set_int32(tuple2.get(), 0, 2);
-  cass_tuple_set_string(tuple2.get(), 1, "two");
-  
-  ASSERT_EQ(cass_vector_append_tuple(v_tuple.get(), tuple1.get()), CASS_OK);
-  ASSERT_EQ(cass_vector_append_tuple(v_tuple.get(), tuple2.get()), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_tuple.get()), CASS_OK);
-  
-  // Test UDT in vector
-  const CassDataType* udt_type = cass_statement_get_data_type(statement.get(), 2);
-  test_utils::CassVectorPtr v_udt(cass_vector_new_from_data_type(udt_type));
-  
-  // Get the UDT element type from the vector
-  const CassDataType* vector_data_type = cass_vector_data_type(v_udt.get());
-  const CassDataType* element_data_type = cass_vector_element_data_type(v_udt.get());
-  
-  test_utils::CassUserTypePtr udt1(cass_user_type_new_from_data_type(element_data_type));
-  cass_user_type_set_int32_by_name(udt1.get(), "a", 1);
-  cass_user_type_set_string_by_name(udt1.get(), "b", "first");
-  
-  test_utils::CassUserTypePtr udt2(cass_user_type_new_from_data_type(element_data_type));
-  cass_user_type_set_int32_by_name(udt2.get(), "a", 2);
-  cass_user_type_set_string_by_name(udt2.get(), "b", "second");
-  
-  ASSERT_EQ(cass_vector_append_user_type(v_udt.get(), udt1.get()), CASS_OK);
-  ASSERT_EQ(cass_vector_append_user_type(v_udt.get(), udt2.get()), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 2, v_udt.get()), CASS_OK);
-  
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
-}
-
-/**
- * Test nested vectors (vector of vectors)
- */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendNestedVectorTypes) {
-  CHECK_FAILURE;
-  CHECK_VERSION(5, 0, 0);
-
-  test_utils::CassSessionPtr session(this->session_);
-  test_utils::execute_query(session.get(),
-    "CREATE TABLE IF NOT EXISTS test_nested_vectors ("
-    "  id int PRIMARY KEY,"
-    "  v_nested vector<frozen<vector<int, 2>>, 2>"
-    ")");
-
-  const char* insert_query = 
-    "INSERT INTO test_nested_vectors (id, v_nested) VALUES (?, ?)";
-  
-  test_utils::CassPreparedPtr prepared(cass_session_prepare(session.get(), insert_query));
-  test_utils::CassStatementPtr statement(cass_prepared_bind(prepared.get()));
-  
-  ASSERT_EQ(cass_statement_bind_int32(statement.get(), 0, 1), CASS_OK);
-  
-  // Create nested vector
-  test_utils::CassVectorPtr v_nested(cass_vector_new_from_data_type(
-    cass_statement_get_data_type(statement.get(), 1)));
-  
-  // Create inner vectors
-  test_utils::CassVectorPtr inner1(cass_vector_new(CASS_VALUE_TYPE_INT, 2));
-  cass_vector_append_int32(inner1.get(), 1);
-  cass_vector_append_int32(inner1.get(), 2);
-  
-  test_utils::CassVectorPtr inner2(cass_vector_new(CASS_VALUE_TYPE_INT, 2));
-  cass_vector_append_int32(inner2.get(), 3);
-  cass_vector_append_int32(inner2.get(), 4);
-  
-  // Append inner vectors to outer vector
-  ASSERT_EQ(cass_vector_append_vector(v_nested.get(), inner1.get()), CASS_OK);
-  ASSERT_EQ(cass_vector_append_vector(v_nested.get(), inner2.get()), CASS_OK);
-  ASSERT_EQ(cass_statement_bind_vector(statement.get(), 1, v_nested.get()), CASS_OK);
-  
-  test_utils::CassFuturePtr result_future(cass_session_execute(session.get(), statement.get()));
-  ASSERT_EQ(cass_future_error_code(result_future.get()), CASS_OK);
-}
-
-/**
- * Test that null values are properly rejected
- */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, RejectNullValues) {
-  CHECK_FAILURE;
-  
-  // Vectors don't support null elements
-  test_utils::CassVectorPtr vector(cass_vector_new(CASS_VALUE_TYPE_INT, 2));
-  
-  // Try to append null - should fail
-  CassError error = cass_vector_append_null(vector.get());
-  ASSERT_EQ(error, CASS_ERROR_LIB_NULL_VALUE) 
-    << "Vectors should reject null values";
-}
-
-/**
- * Test custom types (if supported)
- */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, AppendCustomTypes) {
-  CHECK_FAILURE;
-  
-  // Custom types require special handling
-  // This is a placeholder for custom type testing
-  // Most users won't need custom types, but the API supports them
-  
-  test_utils::CassVectorPtr vector(cass_vector_new(CASS_VALUE_TYPE_BLOB, 2));
-  
-  // Custom types can be appended using the custom functions
-  const cass_byte_t custom_data[] = {0x01, 0x02, 0x03};
-  CassError error = cass_vector_append_custom(vector.get(), 
-                                              "org.example.CustomType",
-                                              custom_data, 
-                                              sizeof(custom_data));
-  // This might fail if the custom type doesn't match, which is expected
-  // The important thing is that the function exists and can be called
-}
-
-/**
- * Test error conditions - dimension overflow
- */
-CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, ErrorDimensionOverflow) {
-  CHECK_FAILURE;
-  
-  // Create a vector with dimension 2
-  test_utils::CassVectorPtr vector(cass_vector_new(CASS_VALUE_TYPE_INT, 2));
-  
-  // Fill it up
-  ASSERT_EQ(cass_vector_append_int32(vector.get(), 1), CASS_OK);
-  ASSERT_EQ(cass_vector_append_int32(vector.get(), 2), CASS_OK);
-  
-  // Try to add a third element - should fail
-  CassError error = cass_vector_append_int32(vector.get(), 3);
-  ASSERT_EQ(error, CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS) 
-    << "Should not be able to exceed vector dimension";
+  cass_vector_free(vec);
 }

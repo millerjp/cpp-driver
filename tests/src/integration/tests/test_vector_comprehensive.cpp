@@ -44,7 +44,7 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, FloatVectorNegativeNumbers) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table with float vector
   session_.execute("CREATE TABLE IF NOT EXISTS float_neg_vectors ("
@@ -106,7 +106,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, FloatVectorNegativeNumbers
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, FloatVectorSpecialValues) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS float_special_vectors ("
@@ -174,7 +174,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, FloatVectorSpecialValues) 
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, IntVectorBoundaries) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS int_boundary_vectors ("
@@ -228,7 +228,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, IntVectorBoundaries) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, DoubleVectorExtremes) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS double_extreme_vectors ("
@@ -274,7 +274,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, DoubleVectorExtremes) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorComprehensiveTest, BigintVectorBoundaries) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS bigint_boundary_vectors ("

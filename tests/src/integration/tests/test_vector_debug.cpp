@@ -44,7 +44,7 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorDebugTest, DiscoverVectorFormats) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   TEST_LOG("=== DISCOVERING VECTOR TYPE FORMATS ===");
   

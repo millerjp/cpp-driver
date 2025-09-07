@@ -117,21 +117,27 @@ TEST_F(VectorTypeParsingTest, FailOnMalformedVector) {
 }
 
 /**
- * Test parsing fails on unknown element type
+ * Test parsing succeeds on unknown element type (Option 5 implementation)
  */
-TEST_F(VectorTypeParsingTest, FailOnUnknownElementType) {
+TEST_F(VectorTypeParsingTest, SucceedOnUnknownElementType) {
   String class_name = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.UnknownType, 3)";
   
   VectorType::ConstPtr vector_type = VectorType::from_class_name(class_name);
-  EXPECT_FALSE(vector_type);
+  ASSERT_TRUE(vector_type);  // Should succeed with unknown type support
+  EXPECT_EQ(vector_type->dimension(), 3u);
+  // Unknown types are represented as CUSTOM types internally
+  EXPECT_EQ(vector_type->element_type()->value_type(), CASS_VALUE_TYPE_CUSTOM);
 }
 
 /**
- * Test parsing fails on nested collection (not yet supported)
+ * Test parsing succeeds on nested collection (now supported)
  */
-TEST_F(VectorTypeParsingTest, FailOnNestedCollection) {
+TEST_F(VectorTypeParsingTest, SucceedOnNestedCollection) {
   String class_name = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.ListType(org.apache.cassandra.db.marshal.Int32Type), 2)";
   
   VectorType::ConstPtr vector_type = VectorType::from_class_name(class_name);
-  EXPECT_FALSE(vector_type);  // Should fail with explicit error message
+  ASSERT_TRUE(vector_type);  // Should succeed with nested collection support
+  EXPECT_EQ(vector_type->dimension(), 2u);
+  ASSERT_TRUE(vector_type->element_type());
+  EXPECT_EQ(vector_type->element_type()->value_type(), CASS_VALUE_TYPE_LIST);
 }

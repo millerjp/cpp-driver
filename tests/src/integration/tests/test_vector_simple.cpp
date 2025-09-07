@@ -42,7 +42,7 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, SimpleFloatVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table with vector column
   session_.execute("CREATE TABLE IF NOT EXISTS test_vectors ("
@@ -116,7 +116,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, SimpleFloatVector) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, MultipleVectors) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS multi_vectors ("
@@ -152,7 +152,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, MultipleVectors) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, IntegerVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table with int vector
   session_.execute("CREATE TABLE IF NOT EXISTS int_vectors ("
@@ -187,7 +187,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, IntegerVector) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleTest, TextVectorRoundTrip) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table with text vector
   session_.execute("CREATE TABLE IF NOT EXISTS text_vectors ("

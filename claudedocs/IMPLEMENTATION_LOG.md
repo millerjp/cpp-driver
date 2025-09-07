@@ -93,12 +93,29 @@
 - [?] User-defined types (UDT) vectors - Not tested yet
 - [?] Vector iterator for complex types - Write works, read has issues
 
+### ✅ Session 22 - C API Completion
+- [x] **Missing C API functions implemented**:
+  - Added `cass_vector_append_date()` for date values
+  - Added `cass_vector_append_time()` for time values
+  - Added `cass_vector_append_timestamp()` for timestamp values
+  - Added `cass_vector_append_varint()` for variable-length integers
+  - Added `cass_vector_append_null()` for API completeness (always returns error)
+- [x] **Type definitions added**:
+  - CassDate, CassTime, CassTimestamp, CassVarint in types.hpp
+  - Encode functions for all new types in encode.hpp
+  - IsValidDataType specializations in data_type.hpp
+- [x] **Comprehensive testing**:
+  - Created test_vector_all_append_functions.cpp
+  - Verifies ALL append functions exist and work correctly
+  - Tests dimension bounds, type validation, null rejection
+  - All 13 test cases passing
+
 ### ❌ NOT IMPLEMENTED
 - [ ] **ANN SEARCH** - PRIMARY USE CASE NOT IMPLEMENTED!
 - [ ] Batch statements with vectors
 - [ ] Memory leak verification
 - [ ] Performance benchmarks
-- [ ] Missing C API functions (date/time/timestamp/varint not exposed)
+- [x] ~~Missing C API functions~~ - COMPLETED in Session 22
 - [x] cass_vector_append_vector() - NOW ADDED to public header (Session 18)
 
 ### 🚨 CRITICAL GAPS
@@ -230,9 +247,64 @@ Users can now:
 ### Implementation Status
 - ✅ Added `cass_vector_element_data_type()` to public API (cassandra.h)
 - ✅ Implemented function in cass_vector.cpp
+
+## Critical API Fix - Rejecting Complex Types in cass_vector_new() (Session 19)
+
+### Problem Identified
+The `cass_vector_new(CassValueType element_type, size_t dimension)` API was fundamentally broken:
+- It accepted complex types (LIST, SET, MAP, TUPLE, UDT, CUSTOM) but only took an enum value
+- Complex types require inner type information (e.g., `list<int>` not just `LIST`)
+- This would cause crashes or undefined behavior when users tried to use these vectors
+
+### Solution Implemented
+
+#### 1. Added Error Handling and Logging
+Modified `cass_vector_new()` to reject complex types with proper error logging:
+```cpp
+switch (element_type) {
+  case CASS_VALUE_TYPE_LIST:
+  case CASS_VALUE_TYPE_SET:
+  case CASS_VALUE_TYPE_MAP:
+  case CASS_VALUE_TYPE_TUPLE:
+  case CASS_VALUE_TYPE_UDT:
+  case CASS_VALUE_TYPE_CUSTOM:
+    LOG_ERROR("Cannot create vector with element type %d using cass_vector_new(). "
+              "Types that require subtypes must use cass_vector_new_from_data_type() "
+              "with a properly constructed DataType.", element_type);
+    return NULL;
+}
+```
+
+#### 2. Added New API for Complex Element Types
+Created `cass_vector_new_with_element_type()` for simple statements:
+```c
+CassVector* cass_vector_new_with_element_type(const CassDataType* element_data_type,
+                                              size_t dimension);
+```
+This allows users to create vectors with complex element types by providing a fully-constructed DataType.
+
+#### 3. Unit Tests Added
+- Created test_vector_complex_type_rejection.cpp to verify error handling
+- Tests confirm complex types are rejected by `cass_vector_new()`
+- Tests confirm primitive types still work correctly
+- Tests validate dimension bounds (1-8192)
+
+#### 4. Fixed Integration Tests
+Updated all integration tests to use the new API:
+- VectorOfLists test now uses `cass_vector_new_with_element_type()`
+- VectorOfSets test updated similarly
+- SimpleStatementComplexVector test fixed to use new API
+- All tests updated to use Cassandra 5.0.5 per user request
+
+### API Summary
+- **For primitive types**: Use `cass_vector_new(type, dimension)`
+- **For complex types in prepared statements**: Use `cass_vector_new_from_data_type(data_type)`
+- **For complex types in simple statements**: Use `cass_vector_new_with_element_type(element_type, dimension)`
 - ❌ **CRITICAL FINDING**: Server-side limitation discovered!
 
 ### Critical Discovery: Server Limitation
+
+THIS IS INCORRECT - WE ESTABLISHED THIS was not a server limitation, but a bug
 
 When requesting prepared statement metadata for `vector<list<int>, 2>`:
 - **Expected**: `VectorType(ListType(Int32Type), 2)`

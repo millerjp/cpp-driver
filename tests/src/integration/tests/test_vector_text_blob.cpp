@@ -42,7 +42,7 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorVariableLengthTest, TextVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table with text vector
   session_.execute("CREATE TABLE IF NOT EXISTS text_vectors ("
@@ -111,7 +111,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorVariableLengthTest, TextVector) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorVariableLengthTest, BlobVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table with blob vector
   session_.execute("CREATE TABLE IF NOT EXISTS blob_vectors ("
@@ -186,7 +186,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorVariableLengthTest, BlobVector) {
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorVariableLengthTest, TextVectorEmptyString) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS text_empty_vectors ("

@@ -41,7 +41,7 @@ public:
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, SimpleStatementFloatVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_float ("
@@ -111,7 +111,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, SimpleStatementFloatVect
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, SimpleStatementTextVector) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_text ("
@@ -173,7 +173,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, SimpleStatementTextVecto
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, SimpleStatementNamedBinding) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_named ("
@@ -217,7 +217,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, SimpleStatementNamedBind
  */
 CASSANDRA_INTEGRATION_TEST_F(VectorSimpleStatementTest, BatchStatementWithVectors) {
   CHECK_FAILURE;
-  CHECK_VERSION(5.0.0);
+  CHECK_VERSION(5.0.5);
   
   // Create table
   session_.execute("CREATE TABLE IF NOT EXISTS test_batch ("

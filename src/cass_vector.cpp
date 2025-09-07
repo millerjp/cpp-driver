@@ -18,6 +18,7 @@
 #include "collection.hpp"
 #include "constants.hpp"
 #include "external.hpp"
+#include "logger.hpp"
 #include "macros.hpp"
 #include "tuple.hpp"
 #include "user_type_value.hpp"
@@ -31,8 +32,31 @@ extern "C" {
 
 CassVector* cass_vector_new(CassValueType element_type, size_t dimension) {
   if (dimension == 0 || dimension > 8192) {
+    LOG_ERROR("Cannot create vector: dimension %zu is out of range (1-8192)", dimension);
     return NULL;
   }
+  
+  // Reject types that require subtypes - these cannot be properly constructed
+  // with just an enum value as they need inner type information
+  switch (element_type) {
+    case CASS_VALUE_TYPE_LIST:
+    case CASS_VALUE_TYPE_SET:
+    case CASS_VALUE_TYPE_MAP:
+    case CASS_VALUE_TYPE_TUPLE:
+    case CASS_VALUE_TYPE_UDT:
+    case CASS_VALUE_TYPE_CUSTOM:
+      // These types require subtypes and cannot be created with this API
+      // Use cass_vector_new_from_data_type() with a properly constructed DataType instead
+      LOG_ERROR("Cannot create vector with element type %d using cass_vector_new(). "
+                "Types that require subtypes (LIST, SET, MAP, TUPLE, UDT, CUSTOM) "
+                "must use cass_vector_new_from_data_type() with a properly constructed DataType.",
+                static_cast<int>(element_type));
+      return NULL;
+    default:
+      // Primitive types are OK
+      break;
+  }
+  
   DataType::ConstPtr type(new DataType(element_type));
   CassandraVector* vector = new CassandraVector(type, dimension);
   vector->inc_ref();
@@ -51,6 +75,27 @@ CassVector* cass_vector_new_from_data_type(const CassDataType* data_type) {
   }
   
   CassandraVector* vector = new CassandraVector(vector_type);
+  vector->inc_ref();
+  return CassVector::to(vector);
+}
+
+CassVector* cass_vector_new_with_element_type(const CassDataType* element_data_type,
+                                              size_t dimension) {
+  if (!element_data_type) {
+    LOG_ERROR("Cannot create vector: element_data_type is NULL");
+    return NULL;
+  }
+  
+  if (dimension == 0 || dimension > 8192) {
+    LOG_ERROR("Cannot create vector: dimension %zu is out of range (1-8192)", dimension);
+    return NULL;
+  }
+  
+  // Create a DataType pointer from the C API type
+  DataType::ConstPtr element_type(element_data_type->from());
+  
+  // Create the vector with the specified element type and dimension
+  CassandraVector* vector = new CassandraVector(element_type, dimension);
   vector->inc_ref();
   return CassVector::to(vector);
 }
