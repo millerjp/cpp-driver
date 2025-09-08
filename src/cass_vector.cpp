@@ -17,6 +17,7 @@
 #include "cass_vector.hpp"
 #include "collection.hpp"
 #include "constants.hpp"
+#include "data_type.hpp"
 #include "external.hpp"
 #include "logger.hpp"
 #include "macros.hpp"
@@ -46,10 +47,11 @@ CassVector* cass_vector_new(CassValueType element_type, size_t dimension) {
     case CASS_VALUE_TYPE_UDT:
     case CASS_VALUE_TYPE_CUSTOM:
       // These types require subtypes and cannot be created with this API
-      // Use cass_vector_new_from_data_type() with a properly constructed DataType instead
+      // Use cass_vector_new_with_element_type() with a properly constructed DataType instead
       LOG_ERROR("Cannot create vector with element type %d using cass_vector_new(). "
-                "Types that require subtypes (LIST, SET, MAP, TUPLE, UDT, CUSTOM) "
-                "must use cass_vector_new_from_data_type() with a properly constructed DataType.",
+                "For vectors with LIST/SET/MAP elements, use cass_vector_new_list(), "
+                "cass_vector_new_set(), or cass_vector_new_map(). "
+                "For TUPLE/UDT/CUSTOM elements, use cass_vector_new_with_element_type().",
                 static_cast<int>(element_type));
       return NULL;
     default:
@@ -306,6 +308,9 @@ CassError CassandraVector::append(CassNull value) {
 }
 
 CassError CassandraVector::append(const Collection* value) {
+  if (!value) {
+    return CASS_ERROR_LIB_NULL_VALUE;
+  }
   CASS_VECTOR_CHECK_DIMENSION();
   CASS_VECTOR_CHECK_TYPE(value);
   elements_.push_back(value->encode());
@@ -313,6 +318,9 @@ CassError CassandraVector::append(const Collection* value) {
 }
 
 CassError CassandraVector::append(const Tuple* value) {
+  if (!value) {
+    return CASS_ERROR_LIB_NULL_VALUE;
+  }
   CASS_VECTOR_CHECK_DIMENSION();
   CASS_VECTOR_CHECK_TYPE(value);
   elements_.push_back(value->encode());
@@ -320,6 +328,9 @@ CassError CassandraVector::append(const Tuple* value) {
 }
 
 CassError CassandraVector::append(const UserTypeValue* value) {
+  if (!value) {
+    return CASS_ERROR_LIB_NULL_VALUE;
+  }
   CASS_VECTOR_CHECK_DIMENSION();
   CASS_VECTOR_CHECK_TYPE(value);
   elements_.push_back(value->encode());
@@ -327,6 +338,9 @@ CassError CassandraVector::append(const UserTypeValue* value) {
 }
 
 CassError CassandraVector::append(const CassandraVector* value) {
+  if (!value) {
+    return CASS_ERROR_LIB_NULL_VALUE;
+  }
   CASS_VECTOR_CHECK_DIMENSION();
   CASS_VECTOR_CHECK_TYPE(value);
   elements_.push_back(value->encode());

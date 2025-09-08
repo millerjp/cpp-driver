@@ -71,7 +71,8 @@ TEST_F(VectorTest, VectorTypeCreation) {
   EXPECT_TRUE(vec_type.is_fixed_length_element());
   
   // Check class name generation
-  String expected = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType, 3)";
+  // Note: Cassandra uses " , " (space-comma-space) as per TypeParser.stringifyVectorParameters()
+  String expected = "org.apache.cassandra.db.marshal.VectorType(org.apache.cassandra.db.marshal.FloatType , 3)";
   EXPECT_EQ(vec_type.class_name(), expected);
 }
 

@@ -81,6 +81,12 @@ public:
 private:
   void update_class_name();
   
+  /**
+   * Get the Java class name for a data type.
+   * This handles all simple types, collections, tuples, UDTs, and custom types.
+   */
+  static String get_java_class_name(const DataType::ConstPtr& type);
+  
 private:
   DataType::ConstPtr element_type_;
   size_t dimension_;

@@ -416,9 +416,22 @@ bool IsValidDataType<const UserTypeValue*>::operator()(const UserTypeValue* valu
 
 bool IsValidDataType<const CassandraVector*>::operator()(const CassandraVector* value,
                                                          const DataType::ConstPtr& data_type) const {
+  // First check if the vector's own data type matches the expected type
+  // This handles cases where both types are VectorType objects
+  if (value->data_type()->equals(data_type)) {
+    return true;
+  }
+  
   // Vectors can be bound to CUSTOM types (this is how Cassandra represents them in prepared statements)
   if (data_type->value_type() == CASS_VALUE_TYPE_CUSTOM) {
     const CustomType* custom_type = static_cast<const CustomType*>(data_type.get());
+    
+    // Check if the expected type is already a VectorType
+    const VectorType* expected_vector_direct = dynamic_cast<const VectorType*>(data_type.get());
+    if (expected_vector_direct) {
+      // Direct comparison with VectorType
+      return value->data_type()->equals(data_type);
+    }
     
     // Parse the VectorType to validate element type and dimension
     VectorType::ConstPtr expected_vector = VectorType::from_class_name(custom_type->class_name());
@@ -443,5 +456,5 @@ bool IsValidDataType<const CassandraVector*>::operator()(const CassandraVector* 
     // If it's not a valid vector type, reject it
     return false;
   }
-  return value->data_type()->equals(data_type);
+  return false;
 }

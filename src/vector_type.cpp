@@ -18,7 +18,10 @@
 #include "string.hpp"
 #include "logger.hpp"
 #include "data_type_parser.hpp"
+#include "collection.hpp"
+#include "macros.hpp"
 #include <cstdlib>
+#include <stdio.h>
 
 namespace datastax { namespace internal { namespace core {
 
@@ -179,159 +182,228 @@ String VectorType::to_string() const {
   return ss.str();
 }
 
-void VectorType::update_class_name() {
-  OStringStream ss;
-  ss << VECTOR_CLASS_NAME << "(";
-  
-  // Convert element type to Java class name format
-  if (element_type_) {
-    // This would need to map C++ types to Java class names
-    // For now, using a simplified version
-    switch (element_type_->value_type()) {
-      case CASS_VALUE_TYPE_INT:
-        ss << "org.apache.cassandra.db.marshal.Int32Type";
-        break;
-      case CASS_VALUE_TYPE_BIGINT:
-        ss << "org.apache.cassandra.db.marshal.LongType";
-        break;
-      case CASS_VALUE_TYPE_FLOAT:
-        ss << "org.apache.cassandra.db.marshal.FloatType";
-        break;
-      case CASS_VALUE_TYPE_DOUBLE:
-        ss << "org.apache.cassandra.db.marshal.DoubleType";
-        break;
-      case CASS_VALUE_TYPE_TEXT:
-      case CASS_VALUE_TYPE_VARCHAR:
-        ss << "org.apache.cassandra.db.marshal.UTF8Type";
-        break;
-      case CASS_VALUE_TYPE_BOOLEAN:
-        ss << "org.apache.cassandra.db.marshal.BooleanType";
-        break;
-      case CASS_VALUE_TYPE_UUID:
-        ss << "org.apache.cassandra.db.marshal.UUIDType";
-        break;
-      case CASS_VALUE_TYPE_TIMEUUID:
-        ss << "org.apache.cassandra.db.marshal.TimeUUIDType";
-        break;
-      case CASS_VALUE_TYPE_TIMESTAMP:
-        ss << "org.apache.cassandra.db.marshal.TimestampType";
-        break;
-      case CASS_VALUE_TYPE_BLOB:
-        ss << "org.apache.cassandra.db.marshal.BytesType";
-        break;
-      case CASS_VALUE_TYPE_LIST:
-        // For LIST types, need to include the element type
-        {
-          const CollectionType* collection = static_cast<const CollectionType*>(element_type_.get());
-          if (collection && !collection->types().empty()) {
-            ss << "org.apache.cassandra.db.marshal.ListType(";
-            // Recursively get the class name for the element type
-            DataType::ConstPtr elem = collection->types()[0];
-            // For now, handle simple types
-            switch (elem->value_type()) {
-              case CASS_VALUE_TYPE_INT:
-                ss << "org.apache.cassandra.db.marshal.Int32Type";
-                break;
-              case CASS_VALUE_TYPE_TEXT:
-              case CASS_VALUE_TYPE_VARCHAR:
-                ss << "org.apache.cassandra.db.marshal.UTF8Type";
-                break;
-              default:
-                ss << "unknown";
-                break;
-            }
-            ss << ")";
-          } else {
-            ss << "unknown";
-          }
-        }
-        break;
-      case CASS_VALUE_TYPE_SET:
-        // For SET types, need to include the element type
-        {
-          const CollectionType* collection = static_cast<const CollectionType*>(element_type_.get());
-          if (collection && !collection->types().empty()) {
-            ss << "org.apache.cassandra.db.marshal.SetType(";
-            DataType::ConstPtr elem = collection->types()[0];
-            switch (elem->value_type()) {
-              case CASS_VALUE_TYPE_INT:
-                ss << "org.apache.cassandra.db.marshal.Int32Type";
-                break;
-              case CASS_VALUE_TYPE_TEXT:
-              case CASS_VALUE_TYPE_VARCHAR:
-                ss << "org.apache.cassandra.db.marshal.UTF8Type";
-                break;
-              default:
-                ss << "unknown";
-                break;
-            }
-            ss << ")";
-          } else {
-            ss << "unknown";
-          }
-        }
-        break;
-      case CASS_VALUE_TYPE_MAP:
-        // For MAP types, need to include key and value types
-        {
-          const CollectionType* collection = static_cast<const CollectionType*>(element_type_.get());
-          if (collection && collection->types().size() >= 2) {
-            ss << "org.apache.cassandra.db.marshal.MapType(";
-            DataType::ConstPtr key = collection->types()[0];
-            DataType::ConstPtr val = collection->types()[1];
-            // Handle key type
-            switch (key->value_type()) {
-              case CASS_VALUE_TYPE_INT:
-                ss << "org.apache.cassandra.db.marshal.Int32Type";
-                break;
-              case CASS_VALUE_TYPE_TEXT:
-              case CASS_VALUE_TYPE_VARCHAR:
-                ss << "org.apache.cassandra.db.marshal.UTF8Type";
-                break;
-              default:
-                ss << "unknown";
-                break;
-            }
-            ss << ",";
-            // Handle value type
-            switch (val->value_type()) {
-              case CASS_VALUE_TYPE_INT:
-                ss << "org.apache.cassandra.db.marshal.Int32Type";
-                break;
-              case CASS_VALUE_TYPE_TEXT:
-              case CASS_VALUE_TYPE_VARCHAR:
-                ss << "org.apache.cassandra.db.marshal.UTF8Type";
-                break;
-              default:
-                ss << "unknown";
-                break;
-            }
-            ss << ")";
-          } else {
-            ss << "unknown";
-          }
-        }
-        break;
-      case CASS_VALUE_TYPE_CUSTOM:
-        // For custom types (like nested vectors), use their class name
-        {
-          const CustomType* custom = static_cast<const CustomType*>(element_type_.get());
-          if (custom) {
-            ss << custom->class_name();
-          } else {
-            ss << "unknown";
-          }
-        }
-        break;
-      default:
-        ss << "unknown";
-        break;
-    }
-  } else {
-    ss << "unknown";
+// Static function to get Java class name for any data type
+String VectorType::get_java_class_name(const DataType::ConstPtr& type) {
+  if (!type) {
+    LOG_ERROR("Cannot get Java class name for null data type");
+    return "";  // Return empty string to indicate error
   }
   
-  ss << ", " << dimension_ << ")";
+  switch (type->value_type()) {
+    // ALL simple types from CASS_VALUE_TYPE_MAPPING
+    case CASS_VALUE_TYPE_ASCII:
+      return "org.apache.cassandra.db.marshal.AsciiType";
+    case CASS_VALUE_TYPE_BIGINT:
+      return "org.apache.cassandra.db.marshal.LongType";
+    case CASS_VALUE_TYPE_BLOB:
+      return "org.apache.cassandra.db.marshal.BytesType";
+    case CASS_VALUE_TYPE_BOOLEAN:
+      return "org.apache.cassandra.db.marshal.BooleanType";
+    case CASS_VALUE_TYPE_COUNTER:
+      return "org.apache.cassandra.db.marshal.CounterColumnType";
+    case CASS_VALUE_TYPE_DECIMAL:
+      return "org.apache.cassandra.db.marshal.DecimalType";
+    case CASS_VALUE_TYPE_DOUBLE:
+      return "org.apache.cassandra.db.marshal.DoubleType";
+    case CASS_VALUE_TYPE_FLOAT:
+      return "org.apache.cassandra.db.marshal.FloatType";
+    case CASS_VALUE_TYPE_INT:
+      return "org.apache.cassandra.db.marshal.Int32Type";
+    case CASS_VALUE_TYPE_TEXT:
+    case CASS_VALUE_TYPE_VARCHAR:
+      return "org.apache.cassandra.db.marshal.UTF8Type";
+    case CASS_VALUE_TYPE_TIMESTAMP:
+      return "org.apache.cassandra.db.marshal.TimestampType";
+    case CASS_VALUE_TYPE_UUID:
+      return "org.apache.cassandra.db.marshal.UUIDType";
+    case CASS_VALUE_TYPE_VARINT:
+      return "org.apache.cassandra.db.marshal.IntegerType";
+    case CASS_VALUE_TYPE_TIMEUUID:
+      return "org.apache.cassandra.db.marshal.TimeUUIDType";
+    case CASS_VALUE_TYPE_INET:
+      return "org.apache.cassandra.db.marshal.InetAddressType";
+    case CASS_VALUE_TYPE_DATE:
+      return "org.apache.cassandra.db.marshal.SimpleDateType";
+    case CASS_VALUE_TYPE_TIME:
+      return "org.apache.cassandra.db.marshal.TimeType";
+    case CASS_VALUE_TYPE_SMALL_INT:
+      return "org.apache.cassandra.db.marshal.ShortType";
+    case CASS_VALUE_TYPE_TINY_INT:
+      return "org.apache.cassandra.db.marshal.ByteType";
+    case CASS_VALUE_TYPE_DURATION:
+      return "org.apache.cassandra.db.marshal.DurationType";
+      
+    // Collection types - recursively handle element types
+    case CASS_VALUE_TYPE_LIST:
+      {
+        const CollectionType* collection = static_cast<const CollectionType*>(type.get());
+        if (!collection) {
+          LOG_ERROR("LIST type is not a CollectionType");
+          return "";
+        }
+        if (collection->types().empty()) {
+          LOG_ERROR("LIST type has no element type");
+          return "";
+        }
+        String elem_class = get_java_class_name(collection->types()[0]);
+        if (elem_class.empty()) {
+          LOG_ERROR("Failed to get Java class name for LIST element type");
+          return "";
+        }
+        OStringStream ss;
+        ss << "org.apache.cassandra.db.marshal.ListType(" << elem_class << ")";
+        return ss.str();
+      }
+      
+    case CASS_VALUE_TYPE_SET:
+      {
+        const CollectionType* collection = static_cast<const CollectionType*>(type.get());
+        if (!collection) {
+          LOG_ERROR("SET type is not a CollectionType");
+          return "";
+        }
+        if (collection->types().empty()) {
+          LOG_ERROR("SET type has no element type");
+          return "";
+        }
+        String elem_class = get_java_class_name(collection->types()[0]);
+        if (elem_class.empty()) {
+          LOG_ERROR("Failed to get Java class name for SET element type");
+          return "";
+        }
+        OStringStream ss;
+        ss << "org.apache.cassandra.db.marshal.SetType(" << elem_class << ")";
+        return ss.str();
+      }
+      
+    case CASS_VALUE_TYPE_MAP:
+      {
+        const CollectionType* collection = static_cast<const CollectionType*>(type.get());
+        if (!collection) {
+          LOG_ERROR("MAP type is not a CollectionType");
+          return "";
+        }
+        if (collection->types().size() < 2) {
+          LOG_ERROR("MAP type has insufficient types (need key and value)");
+          return "";
+        }
+        String key_class = get_java_class_name(collection->types()[0]);
+        if (key_class.empty()) {
+          LOG_ERROR("Failed to get Java class name for MAP key type");
+          return "";
+        }
+        String val_class = get_java_class_name(collection->types()[1]);
+        if (val_class.empty()) {
+          LOG_ERROR("Failed to get Java class name for MAP value type");
+          return "";
+        }
+        OStringStream ss;
+        ss << "org.apache.cassandra.db.marshal.MapType(" << key_class << "," << val_class << ")";
+        return ss.str();
+      }
+      
+    case CASS_VALUE_TYPE_TUPLE:
+      {
+        const TupleType* tuple = static_cast<const TupleType*>(type.get());
+        if (!tuple) {
+          LOG_ERROR("TUPLE type is not a TupleType");
+          return "";
+        }
+        OStringStream ss;
+        ss << "org.apache.cassandra.db.marshal.TupleType(";
+        bool first = true;
+        for (size_t i = 0; i < tuple->types().size(); ++i) {
+          if (!first) ss << ",";
+          String elem_class = get_java_class_name(tuple->types()[i]);
+          if (elem_class.empty()) {
+            LOG_ERROR("Failed to get Java class name for TUPLE element %zu", i);
+            return "";
+          }
+          ss << elem_class;
+          first = false;
+        }
+        ss << ")";
+        return ss.str();
+      }
+      
+    case CASS_VALUE_TYPE_UDT:
+      {
+        const UserType* udt = static_cast<const UserType*>(type.get());
+        if (!udt) {
+          LOG_ERROR("UDT type is not a UserType");
+          return "";
+        }
+        OStringStream ss;
+        ss << "org.apache.cassandra.db.marshal.UserType(";
+        ss << udt->keyspace() << ",";
+        // Convert UDT name to hex
+        const String& name = udt->type_name();
+        for (size_t i = 0; i < name.size(); ++i) {
+          char buf[3];
+          snprintf(buf, sizeof(buf), "%02x", (unsigned char)name[i]);
+          ss << buf;
+        }
+        // Add field definitions
+        for (size_t i = 0; i < udt->fields().size(); ++i) {
+          const UserType::Field& field = udt->fields()[i];
+          ss << ",";
+          // Field name in hex
+          for (size_t j = 0; j < field.name.size(); ++j) {
+            char buf[3];
+            snprintf(buf, sizeof(buf), "%02x", (unsigned char)field.name[j]);
+            ss << buf;
+          }
+          ss << ":";
+          String field_class = get_java_class_name(field.type);
+          if (field_class.empty()) {
+            LOG_ERROR("Failed to get Java class name for UDT field '%s'", field.name.c_str());
+            return "";
+          }
+          ss << field_class;
+        }
+        ss << ")";
+        return ss.str();
+      }
+      
+    case CASS_VALUE_TYPE_CUSTOM:
+      {
+        const CustomType* custom = static_cast<const CustomType*>(type.get());
+        if (!custom) {
+          LOG_ERROR("CUSTOM type is not a CustomType");
+          return "";
+        }
+        // Custom types already have their full Java class name
+        return custom->class_name();
+      }
+      
+    default:
+      LOG_ERROR("Unknown or unsupported value type %d for Java class name conversion", type->value_type());
+      return "";
+  }
+}
+
+void VectorType::update_class_name() {
+  if (!element_type_) {
+    LOG_ERROR("Cannot update class name for vector with null element type");
+    set_class_name(VECTOR_CLASS_NAME);  // Set base name as fallback
+    return;
+  }
+  
+  String element_class = get_java_class_name(element_type_);
+  if (element_class.empty()) {
+    LOG_ERROR("Failed to get Java class name for vector element type %d - vector will not work properly", 
+              element_type_->value_type());
+    // Still need to set something, but this indicates an error
+    OStringStream ss;
+    ss << VECTOR_CLASS_NAME << "(ERROR , " << dimension_ << ")";
+    set_class_name(ss.str());
+    return;
+  }
+  
+  OStringStream ss;
+  ss << VECTOR_CLASS_NAME << "(";
+  ss << element_class;
+  ss << " , " << dimension_ << ")";  // Space before comma to match Cassandra format
   set_class_name(ss.str());
 }
 

@@ -346,9 +346,9 @@ CASSANDRA_INTEGRATION_TEST_F(VectorAllAppendTypesTest, DimensionOverflow) {
   ASSERT_EQ(cass_vector_append_int32(vec, 1), CASS_OK);
   ASSERT_EQ(cass_vector_append_int32(vec, 2), CASS_OK);
   
-  // Try to add a third element - should fail with dimension exceeded error
+  // Try to add a third element - should fail with index out of bounds error
   CassError error = cass_vector_append_int32(vec, 3);
-  ASSERT_EQ(error, CASS_ERROR_LIB_INVALID_VALUE_TYPE);
+  ASSERT_EQ(error, CASS_ERROR_LIB_INDEX_OUT_OF_BOUNDS);
   
   cass_vector_free(vec);
 }

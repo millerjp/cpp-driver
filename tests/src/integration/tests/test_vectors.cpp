@@ -646,6 +646,7 @@ CASSANDRA_INTEGRATION_TEST_F(VectorTests, ErrorCases) {
     // This should fail at the server
     Result result = session_.execute(stmt, false);
     EXPECT_FALSE(result);
-    EXPECT_TRUE(contains(result.error_message(), "Expected 3 elements, but got 2"));
+    // Cassandra 5.0.5 error message format
+    EXPECT_TRUE(contains(result.error_message(), "Not enough bytes to read a vector"));
   }
 }
